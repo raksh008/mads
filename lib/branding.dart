@@ -5,13 +5,13 @@ const Color cream = Color(0xFFF7F6EF);
 const Color ink = Color(0xFF172B3A);
 const Color coral = Color(0xFFD85E58);
 
-final ValueNotifier<ThemeMode> ruvoThemeMode = ValueNotifier(ThemeMode.system);
+final ValueNotifier<ThemeMode> madsThemeMode = ValueNotifier(ThemeMode.system);
 
-class RuvoLogo extends StatelessWidget {
+class MadsLogo extends StatelessWidget {
   final double fontSize;
   final bool showTagline;
 
-  const RuvoLogo({super.key, this.fontSize = 25, this.showTagline = false});
+  const MadsLogo({super.key, this.fontSize = 25, this.showTagline = false});
 
   @override
   Widget build(BuildContext context) {
@@ -43,7 +43,7 @@ class RuvoLogo extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'RUVO',
+              'MADS',
               style: TextStyle(
                 fontSize: fontSize,
                 fontWeight: FontWeight.w800,

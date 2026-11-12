@@ -38,10 +38,10 @@ class _FinancialProfileGateState extends State<FinancialProfileGate> {
   Future<FinanceState> _loadState() async {
     final state = await repository.load();
     final nextThemeMode = _themeModeFromString(state.themeMode);
-    if (mounted && ruvoThemeMode.value != nextThemeMode) {
+    if (mounted && madsThemeMode.value != nextThemeMode) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && ruvoThemeMode.value != nextThemeMode) {
-          ruvoThemeMode.value = nextThemeMode;
+        if (mounted && madsThemeMode.value != nextThemeMode) {
+          madsThemeMode.value = nextThemeMode;
         }
       });
     }
@@ -406,7 +406,7 @@ class _HomeScreenState extends State<HomeScreen> {
           cloudReady: widget.repository.cloudReady,
           onEditFinancialProfile: _editFinancialProfile,
           onThemeChanged: (mode) async {
-            ruvoThemeMode.value = _themeModeFromString(mode);
+            madsThemeMode.value = _themeModeFromString(mode);
             await _save(state.copyWith(themeMode: mode));
           },
           onLogout: () => Supabase.instance.client.auth.signOut(),
@@ -1857,7 +1857,7 @@ class _AddExpenseBoardScreenState extends State<AddExpenseBoardScreen> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Give it a name. RUVO matches it to a category and icon automatically.',
+              'Give it a name. MADS matches it to a category and icon automatically.',
               style: TextStyle(color: Colors.black54, height: 1.5),
             ),
             const SizedBox(height: 22),
@@ -1914,7 +1914,7 @@ class ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final name = userName?.trim().isNotEmpty == true
         ? userName!.trim()
-        : 'RUVO member';
+        : 'MADS member';
     return Scaffold(
       appBar: AppBar(title: const Text('Your profile')),
       body: ListView(
@@ -2056,7 +2056,7 @@ class ProfileScreen extends StatelessWidget {
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 4),
             child: Text(
-              'RUVO uses your current balance as a snapshot. Purchases are tracked separately and are not subtracted from it again.',
+              'MADS uses your current balance as a snapshot. Purchases are tracked separately and are not subtracted from it again.',
               style: TextStyle(
                 color: Colors.black54,
                 height: 1.45,

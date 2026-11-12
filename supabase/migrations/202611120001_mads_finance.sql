@@ -1,4 +1,4 @@
--- RUVO finance foundation. Apply this migration to the Supabase project before
+-- MADS finance foundation. Apply this migration to the Supabase project before
 -- relying on cloud sync. All personal amounts use integer minor units (paise).
 
 create table if not exists public.profiles (

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ruvo/branding.dart';
-import 'package:ruvo/finance/finance_assistant.dart';
-import 'package:ruvo/finance/finance_models.dart';
-import 'package:ruvo/finance/finance_repository.dart';
-import 'package:ruvo/finance/finance_screens.dart';
-import 'package:ruvo/main.dart' as app;
+import 'package:mads/branding.dart';
+import 'package:mads/finance/finance_assistant.dart';
+import 'package:mads/finance/finance_models.dart';
+import 'package:mads/finance/finance_repository.dart';
+import 'package:mads/finance/finance_screens.dart';
+import 'package:mads/main.dart' as app;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class _FakeFinanceRepository implements FinanceRepository {
@@ -256,12 +256,12 @@ void main() {
   testWidgets('saved theme is applied after the profile gate build', (
     tester,
   ) async {
-    ruvoThemeMode.value = ThemeMode.system;
+    madsThemeMode.value = ThemeMode.system;
     final repository = _FakeFinanceRepository(_state(themeMode: 'light'));
 
     await tester.pumpWidget(
       ValueListenableBuilder<ThemeMode>(
-        valueListenable: ruvoThemeMode,
+        valueListenable: madsThemeMode,
         builder: (context, themeMode, child) => MaterialApp(
           theme: ThemeData.light(),
           darkTheme: ThemeData.dark(),
@@ -275,10 +275,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(ruvoThemeMode.value, ThemeMode.light);
+    expect(madsThemeMode.value, ThemeMode.light);
     expect(find.text('Your expense boards'), findsOneWidget);
     expect(tester.takeException(), isNull);
-    ruvoThemeMode.value = ThemeMode.system;
+    madsThemeMode.value = ThemeMode.system;
   });
 
   testWidgets('welcome opens the login screen', (tester) async {

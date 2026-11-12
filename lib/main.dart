@@ -15,16 +15,16 @@ Future<void> main() async {
 
   await Supabase.initialize(
     url: const String.fromEnvironment(
-      'RUVO_SUPABASE_URL',
+      'MADS_SUPABASE_URL',
       defaultValue: 'https://ddslubflmmwxbqsyzign.supabase.co',
     ),
     publishableKey: const String.fromEnvironment(
-      'RUVO_SUPABASE_PUBLISHABLE_KEY',
+      'MADS_SUPABASE_PUBLISHABLE_KEY',
       defaultValue: 'sb_publishable_eHYVT4wNzAOy_DCv59RSqQ_EkTPArIL',
     ),
   );
 
-  runApp(const RuvoApp());
+  runApp(const MadsApp());
 }
 
 final supabase = Supabase.instance.client;
@@ -33,8 +33,8 @@ final supabase = Supabase.instance.client;
 // 4. MAIN APPLICATION
 // ==========================================
 
-class RuvoApp extends StatelessWidget {
-  const RuvoApp({super.key});
+class MadsApp extends StatelessWidget {
+  const MadsApp({super.key});
 
   ThemeData _theme(Brightness brightness) {
     final dark = brightness == Brightness.dark;
@@ -76,10 +76,10 @@ class RuvoApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ValueListenableBuilder<ThemeMode>(
-    valueListenable: ruvoThemeMode,
+    valueListenable: madsThemeMode,
     builder: (context, themeMode, child) => MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'RUVO',
+      title: 'MADS',
       theme: _theme(Brightness.light),
       darkTheme: _theme(Brightness.dark),
       themeMode: themeMode,
@@ -155,7 +155,7 @@ class WelcomeScreen extends StatelessWidget {
             children: [
               const Spacer(),
 
-              const RuvoLogo(fontSize: 28),
+              const MadsLogo(fontSize: 28),
 
               const SizedBox(height: 25),
 
@@ -343,7 +343,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
         child: ListView(
           padding: const EdgeInsets.all(25),
           children: [
-            const RuvoLogo(fontSize: 22),
+            const MadsLogo(fontSize: 22),
 
             const SizedBox(height: 35),
 
@@ -570,7 +570,7 @@ class _LoginScreenState extends State<LoginScreen> {
         child: ListView(
           padding: const EdgeInsets.all(25),
           children: [
-            const RuvoLogo(fontSize: 22),
+            const MadsLogo(fontSize: 22),
 
             const SizedBox(height: 40),
 
@@ -688,7 +688,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   );
                 },
                 child: const Text(
-                  'New to RUVO? Create an account',
+                  'New to MADS? Create an account',
                   style: TextStyle(color: forestGreen),
                 ),
               ),

@@ -83,7 +83,7 @@ class _HouseholdScreenState extends State<HouseholdScreen> {
       _reload();
     } catch (error) {
       _showError(
-        'Could not create this household. Apply the RUVO database migration first.',
+        'Could not create this household. Apply the MADS database migration first.',
       );
     }
   }
@@ -404,7 +404,7 @@ class _HouseholdScreenState extends State<HouseholdScreen> {
           const Icon(Icons.cloud_off_outlined, color: Colors.black45, size: 38),
           const SizedBox(height: 12),
           const Text(
-            'Household sharing needs the RUVO database migration and an internet connection.',
+            'Household sharing needs the MADS database migration and an internet connection.',
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.black54, height: 1.45),
           ),

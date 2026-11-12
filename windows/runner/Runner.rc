@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "ruvo" "\0"
+            VALUE "FileDescription", "mads" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "ruvo" "\0"
+            VALUE "InternalName", "mads" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 com.example. All rights reserved." "\0"
-            VALUE "OriginalFilename", "ruvo.exe" "\0"
-            VALUE "ProductName", "ruvo" "\0"
+            VALUE "OriginalFilename", "mads.exe" "\0"
+            VALUE "ProductName", "mads" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

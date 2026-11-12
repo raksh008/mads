@@ -1,4 +1,4 @@
-package com.example.ruvo
+package com.example.mads
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -12,7 +12,11 @@ class FinanceRepository {
   final SupabaseClient client;
   bool cloudReady = false;
 
-  String get _localKey => 'ruvo_${userId}_finance_v2';
+  String get _localKey => 'mads_${userId}_finance_v2';
+
+  // Historical on-device key names from the app's RUVO era. They are read
+  // (never written) so data saved before the MADS rename still loads.
+  String get _preRenameLocalKey => 'ruvo_${userId}_finance_v2';
   String _legacyKey(String field) => 'ruvo_${userId}_$field';
 
   Future<FinanceState> load() async {
@@ -68,7 +72,8 @@ class FinanceRepository {
 
   Future<FinanceState?> _readLocal() async {
     final prefs = await SharedPreferences.getInstance();
-    final stored = prefs.getString(_localKey);
+    final stored =
+        prefs.getString(_localKey) ?? prefs.getString(_preRenameLocalKey);
     if (stored != null) {
       try {
         return FinanceState.fromJson(
@@ -178,7 +183,7 @@ class FinanceRepository {
   Future<void> _writeLocal(FinanceState state) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_localKey, encodeState(state));
-    await prefs.setString('ruvo_${userId}_theme_mode', state.themeMode);
+    await prefs.setString('mads_${userId}_theme_mode', state.themeMode);
   }
 
   Future<FinanceState?> _readCloud() async {
