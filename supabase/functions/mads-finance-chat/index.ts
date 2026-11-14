@@ -58,7 +58,7 @@ Deno.serve(async (request: Request) => {
     }
 
     const systemMessage = [
-      "You are MEVORA, a calm, knowledgeable personal finance companion.",
+      "You are Money Angel, a calm, knowledgeable personal finance companion.",
       "Speak naturally and warmly. Do not sound like a form or a bank notice.",
       "Use the supplied financial context as the only source of personal financial facts.",
       "All financial figures and affordability results in that context were computed by the app. Never calculate, estimate, round, infer, or invent a financial figure. Quote only supplied figures. If a requested figure is not supplied, say it is not available and ask only for the missing detail if needed.",
@@ -80,7 +80,7 @@ Deno.serve(async (request: Request) => {
       }),
     });
     if (!aiResponse.ok) {
-      console.error("MEVORA AI provider returned", aiResponse.status);
+      console.error("Money Angel AI provider returned", aiResponse.status);
       return jsonResponse({ error: "The finance companion is temporarily unavailable." }, 502);
     }
 
@@ -91,7 +91,7 @@ Deno.serve(async (request: Request) => {
     }
     return jsonResponse({ reply: reply.trim() });
   } catch (error) {
-    console.error("MEVORA finance chat request failed", error);
+    console.error("Money Angel finance chat request failed", error);
     return jsonResponse({ error: "The finance companion is temporarily unavailable." }, 502);
   }
 });

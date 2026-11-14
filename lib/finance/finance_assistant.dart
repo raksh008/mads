@@ -2,27 +2,27 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'finance_models.dart';
 
-class MevoraConversationMessage {
+class MadsConversationMessage {
   final String role;
   final String content;
 
-  const MevoraConversationMessage({required this.role, required this.content});
+  const MadsConversationMessage({required this.role, required this.content});
 
   Map<String, String> toJson() => {'role': role, 'content': content};
 }
 
-class MevoraFinanceContext {
+class MadsFinanceContext {
   final Map<String, dynamic> facts;
   final String currency;
   final int? safeToSpendMinor;
 
-  const MevoraFinanceContext({
+  const MadsFinanceContext({
     required this.facts,
     required this.currency,
     required this.safeToSpendMinor,
   });
 
-  factory MevoraFinanceContext.fromState(FinanceState state, {DateTime? now}) {
+  factory MadsFinanceContext.fromState(FinanceState state, {DateTime? now}) {
     final profile = state.profile;
     final date = now ?? DateTime.now();
     final period = periodOf(date);
@@ -52,7 +52,7 @@ class MevoraFinanceContext {
         .fold(0, (total, allocation) => total + allocation.amountMinor);
     final poolMinor = profile?.monthlyBudgetPoolMinor;
 
-    return MevoraFinanceContext(
+    return MadsFinanceContext(
       currency: currency,
       safeToSpendMinor: state.safeToSpendMinor,
       facts: {
@@ -149,29 +149,29 @@ class MevoraFinanceContext {
   }
 }
 
-abstract interface class MevoraAssistant {
+abstract interface class MadsAssistant {
   Future<String> reply({
-    required MevoraFinanceContext context,
-    required List<MevoraConversationMessage> conversation,
+    required MadsFinanceContext context,
+    required List<MadsConversationMessage> conversation,
   });
 }
 
-class SupabaseMevoraAssistant implements MevoraAssistant {
-  SupabaseMevoraAssistant(this.client);
+class SupabaseMadsAssistant implements MadsAssistant {
+  SupabaseMadsAssistant(this.client);
 
   final SupabaseClient client;
 
   @override
   Future<String> reply({
-    required MevoraFinanceContext context,
-    required List<MevoraConversationMessage> conversation,
+    required MadsFinanceContext context,
+    required List<MadsConversationMessage> conversation,
   }) async {
     final latestUserMessage = conversation.lastWhere(
       (message) => message.role == 'user',
-      orElse: () => const MevoraConversationMessage(role: 'user', content: ''),
+      orElse: () => const MadsConversationMessage(role: 'user', content: ''),
     );
     final response = await client.functions.invoke(
-      'mevora-finance-chat',
+      'mads-finance-chat',
       body: {
         'financialContext': context.factsForQuestion(latestUserMessage.content),
         'messages': conversation.map((message) => message.toJson()).toList(),
@@ -182,14 +182,14 @@ class SupabaseMevoraAssistant implements MevoraAssistant {
       final reply = (data['reply'] as String).trim();
       if (reply.isNotEmpty) return reply;
     }
-    throw const MevoraAssistantException(
-      'MEVORA could not prepare a reply. Please try again.',
+    throw const MadsAssistantException(
+      'Money Angel could not prepare a reply. Please try again.',
     );
   }
 }
 
-class MevoraAssistantException implements Exception {
-  const MevoraAssistantException(this.message);
+class MadsAssistantException implements Exception {
+  const MadsAssistantException(this.message);
 
   final String message;
 

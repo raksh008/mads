@@ -3,12 +3,12 @@ import 'package:flutter/material.dart';
 import '../branding.dart';
 import 'finance_assistant.dart';
 
-class MevoraConversationScreen extends StatefulWidget {
-  final MevoraFinanceContext contextData;
-  final MevoraAssistant assistant;
+class MadsConversationScreen extends StatefulWidget {
+  final MadsFinanceContext contextData;
+  final MadsAssistant assistant;
   final String? initialQuestion;
 
-  const MevoraConversationScreen({
+  const MadsConversationScreen({
     super.key,
     required this.contextData,
     required this.assistant,
@@ -16,14 +16,13 @@ class MevoraConversationScreen extends StatefulWidget {
   });
 
   @override
-  State<MevoraConversationScreen> createState() =>
-      _MevoraConversationScreenState();
+  State<MadsConversationScreen> createState() => _MadsConversationScreenState();
 }
 
-class _MevoraConversationScreenState extends State<MevoraConversationScreen> {
+class _MadsConversationScreenState extends State<MadsConversationScreen> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
-  late final List<MevoraConversationMessage> _messages;
+  late final List<MadsConversationMessage> _messages;
   bool _sending = false;
 
   @override
@@ -33,7 +32,7 @@ class _MevoraConversationScreenState extends State<MevoraConversationScreen> {
         widget.contextData.facts['monthlyIncome'] != null ||
         widget.contextData.facts['balanceSnapshot'] != null;
     _messages = [
-      MevoraConversationMessage(
+      MadsConversationMessage(
         role: 'assistant',
         content: hasProfile
             ? "Hey! Your money profile is ready. How's your month going? Ask me anything, and I'll be clear when something isn't in your records."
@@ -60,7 +59,7 @@ class _MevoraConversationScreenState extends State<MevoraConversationScreen> {
 
     _controller.clear();
     setState(() {
-      _messages.add(MevoraConversationMessage(role: 'user', content: text));
+      _messages.add(MadsConversationMessage(role: 'user', content: text));
       _sending = true;
     });
     _scrollToLatest();
@@ -68,7 +67,7 @@ class _MevoraConversationScreenState extends State<MevoraConversationScreen> {
     try {
       final history = _messages.length > 17
           ? _messages.sublist(_messages.length - 17)
-          : List<MevoraConversationMessage>.of(_messages);
+          : List<MadsConversationMessage>.of(_messages);
       final reply = await widget.assistant.reply(
         context: widget.contextData,
         conversation: history,
@@ -76,14 +75,14 @@ class _MevoraConversationScreenState extends State<MevoraConversationScreen> {
       if (!mounted) return;
       setState(() {
         _messages.add(
-          MevoraConversationMessage(role: 'assistant', content: reply),
+          MadsConversationMessage(role: 'assistant', content: reply),
         );
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _messages.add(
-          const MevoraConversationMessage(
+          const MadsConversationMessage(
             role: 'assistant',
             content: "I can't reach your finance companion right now. Your profile hasn't changed. Please try again in a moment.",
           ),
@@ -114,7 +113,7 @@ class _MevoraConversationScreenState extends State<MevoraConversationScreen> {
       title: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('MEVORA.'),
+          Text('Money Angel'),
           Text(
             'Your finance pal.',
             style: TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
@@ -128,7 +127,7 @@ class _MevoraConversationScreenState extends State<MevoraConversationScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
             child: Text(
-              'When you send a message, MEVORA shares your saved finance summary and chat with its AI service to prepare a reply.',
+              'When you send a message, Money Angel shares your saved finance summary and chat with its AI service to prepare a reply.',
               style: TextStyle(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontSize: 12,

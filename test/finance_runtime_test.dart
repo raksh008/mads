@@ -38,14 +38,14 @@ class _FakeFinanceRepository implements FinanceRepository {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
-class _FakeMevoraAssistant implements MevoraAssistant {
-  MevoraFinanceContext? lastContext;
-  List<MevoraConversationMessage>? lastConversation;
+class _FakeMadsAssistant implements MadsAssistant {
+  MadsFinanceContext? lastContext;
+  List<MadsConversationMessage>? lastConversation;
 
   @override
   Future<String> reply({
-    required MevoraFinanceContext context,
-    required List<MevoraConversationMessage> conversation,
+    required MadsFinanceContext context,
+    required List<MadsConversationMessage> conversation,
   }) async {
     lastContext = context;
     lastConversation = conversation;
@@ -189,7 +189,7 @@ void main() {
             ),
           ],
         );
-        final context = MevoraFinanceContext.fromState(
+        final context = MadsFinanceContext.fromState(
           state,
           now: DateTime(2026, 11, 12),
         );
@@ -316,11 +316,11 @@ void main() {
     expect(loggedOut, isTrue);
   });
 
-  testWidgets('dashboard introduces MEVORA and starts a contextual chat', (
+  testWidgets('dashboard introduces Money Angel and starts a contextual chat', (
     tester,
   ) async {
     final repository = _FakeFinanceRepository(_state());
-    final assistant = _FakeMevoraAssistant();
+    final assistant = _FakeMadsAssistant();
     await tester.pumpWidget(
       MaterialApp(
         home: HomeScreen(
@@ -333,15 +333,17 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('MEVORA.'), findsOneWidget);
+    expect(find.text('MADS.'), findsOneWidget);
     expect(find.text('Your finance pal.'), findsOneWidget);
     expect(find.text('Hi, Test!'), findsOneWidget);
     expect(find.text('Your money, organised for the month.'), findsOneWidget);
+    expect(find.text('Money Angel is here, Test'), findsOneWidget);
 
     await tester.ensureVisible(find.text('Start a conversation'));
     await tester.tap(find.text('Start a conversation'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Your money profile is ready'), findsOneWidget);
+    expect(find.text('Money Angel'), findsOneWidget);
 
     await tester.enterText(
       find.byType(TextField),
