@@ -277,11 +277,11 @@ void main() {
 
     expect(madsThemeMode.value, ThemeMode.light);
     await tester.scrollUntilVisible(
-      find.text('Your expense boards'),
+      find.textContaining('SPENT THIS MONTH'),
       200,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(find.text('Your expense boards'), findsOneWidget);
+    expect(find.textContaining('SPENT THIS MONTH'), findsOneWidget);
     expect(tester.takeException(), isNull);
     madsThemeMode.value = ThemeMode.system;
   });
@@ -476,11 +476,9 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('₹80,000'), findsOneWidget);
 
-      await tester.scrollUntilVisible(
-        find.text('Groceries'),
-        350,
-        scrollable: find.byType(Scrollable).first,
-      );
+      // Boards live in the Boards tab; Home only shows a summary card.
+      await tester.tap(find.text('Boards'));
+      await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Groceries').first);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Groceries').first);
