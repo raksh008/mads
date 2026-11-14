@@ -946,7 +946,6 @@ class _HomeScreenState extends State<HomeScreen> {
         else
           ...items.map((transaction) {
             final board = _boardForId(state.boards, transaction.boardId);
-            final sign = transaction.kind == TransactionKind.refund ? '+' : '−';
             return Card(
               child: ListTile(
                 leading: transaction.merchantKey != null
@@ -965,14 +964,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                 title: Text(transaction.description),
                 subtitle: Text(
-                  '${board?.name ?? 'Board'} · ${_dateLabel(transaction.occurredAt)}',
+                  '${_kindPrefix(transaction)}${board?.name ?? 'Board'} · ${_dateLabel(transaction.occurredAt)}',
                 ),
                 trailing: Text(
-                  '$sign${Money.format(transaction.amountMinor, currency: currency)}',
+                  _signedAmount(transaction, currency),
                   style: TextStyle(
-                    color: transaction.kind == TransactionKind.refund
-                        ? forestGreen
-                        : ink,
+                    color: _amountColor(transaction),
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -1714,10 +1711,6 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
   String get month => _monthLabel(DateTime.now());
 
   Widget _transactionTile(FinanceTransaction transaction) {
-    final sign = transaction.kind == TransactionKind.refund ? '+' : '−';
-    final color = transaction.kind == TransactionKind.refund
-        ? forestGreen
-        : ink;
     return Card(
       child: ListTile(
         leading: transaction.merchantKey != null
@@ -1729,20 +1722,23 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
               )
             : CircleAvatar(
                 backgroundColor: forestGreen.withValues(alpha: 0.1),
-                child: Icon(
-                  transaction.kind == TransactionKind.refund
-                      ? Icons.undo_rounded
-                      : Icons.receipt_long_outlined,
-                  color: forestGreen,
-                ),
+                child: Icon(switch (transaction.kind) {
+                  TransactionKind.expense => Icons.receipt_long_outlined,
+                  TransactionKind.refund => Icons.undo_rounded,
+                  TransactionKind.income => Icons.south_west_rounded,
+                  TransactionKind.transfer => Icons.swap_horiz_rounded,
+                }, color: forestGreen),
               ),
         title: Text(transaction.description),
         subtitle: Text(
-          '${_dateLabel(transaction.occurredAt)} · ${transaction.status.name}',
+          '${_kindPrefix(transaction)}${_dateLabel(transaction.occurredAt)} · ${transaction.status.name}',
         ),
         trailing: Text(
-          '$sign${Money.format(transaction.amountMinor, currency: currency)}',
-          style: TextStyle(color: color, fontWeight: FontWeight.w700),
+          _signedAmount(transaction, currency),
+          style: TextStyle(
+            color: _amountColor(transaction),
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
     );
@@ -2387,3 +2383,23 @@ String _monthLabel(DateTime date) {
 
 String _dateLabel(DateTime date) =>
     '${date.day} ${_monthLabel(date).split(' ').first} ${date.year}';
+
+/// Display-only sign for a transaction amount. Calculations live in the model.
+String _signedAmount(FinanceTransaction transaction, String currency) {
+  final amount = Money.format(transaction.amountMinor, currency: currency);
+  return switch (transaction.kind) {
+    TransactionKind.expense => '−$amount',
+    TransactionKind.refund || TransactionKind.income => '+$amount',
+    TransactionKind.transfer => amount,
+  };
+}
+
+Color _amountColor(FinanceTransaction transaction) =>
+    switch (transaction.kind) {
+      TransactionKind.expense => ink,
+      TransactionKind.refund || TransactionKind.income => forestGreen,
+      TransactionKind.transfer => Colors.black54,
+    };
+
+String _kindPrefix(FinanceTransaction transaction) =>
+    transaction.kind == TransactionKind.transfer ? 'Transfer · ' : '';

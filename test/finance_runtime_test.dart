@@ -374,6 +374,42 @@ void main() {
     expect(loggedOut, isTrue);
   });
 
+  testWidgets('recent activity shows income with a plus sign', (tester) async {
+    final base = _state();
+    final repository = _FakeFinanceRepository(
+      base.copyWith(
+        transactions: [
+          FinanceTransaction(
+            id: 'salary',
+            boardId: base.boards.first.id,
+            description: 'Salary',
+            amountMinor: 500_000,
+            occurredAt: DateTime(2026, 11, 13),
+            kind: TransactionKind.income,
+          ),
+        ],
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HomeScreen(
+          repository: repository,
+          initialState: repository.state,
+          userName: 'Test User',
+          assistant: _FakeMadsAssistant(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Salary'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('+₹5,000'), findsOneWidget);
+    expect(find.text('−₹5,000'), findsNothing);
+  });
+
   testWidgets('bottom navigation switches between home tabs', (tester) async {
     final repository = _FakeFinanceRepository(_state());
     await tester.pumpWidget(
