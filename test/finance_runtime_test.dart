@@ -276,6 +276,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(madsThemeMode.value, ThemeMode.light);
+    await tester.scrollUntilVisible(
+      find.text('Your expense boards'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('Your expense boards'), findsOneWidget);
     expect(tester.takeException(), isNull);
     madsThemeMode.value = ThemeMode.system;
@@ -316,6 +321,40 @@ void main() {
     expect(loggedOut, isTrue);
   });
 
+  testWidgets('bottom navigation switches between home tabs', (tester) async {
+    final repository = _FakeFinanceRepository(_state());
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HomeScreen(
+          repository: repository,
+          initialState: repository.state,
+          userName: 'Test User',
+          assistant: _FakeMadsAssistant(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(NavigationBar), findsOneWidget);
+
+    await tester.tap(find.text('Boards'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Boards ·'), findsOneWidget);
+    expect(find.text('Add board'), findsOneWidget);
+
+    await tester.tap(find.text('Profile'));
+    await tester.pumpAndSettle();
+    expect(find.text('Your profile'), findsOneWidget);
+
+    await tester.tap(find.text('Money Angel'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TextField), findsOneWidget);
+
+    await tester.tap(find.text('Home'));
+    await tester.pumpAndSettle();
+    expect(find.text('Hi, Test!'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('dashboard introduces Money Angel and starts a contextual chat', (
     tester,
   ) async {
@@ -340,6 +379,7 @@ void main() {
     expect(find.text('Money Angel is here, Test'), findsOneWidget);
 
     await tester.ensureVisible(find.text('Start a conversation'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Start a conversation'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Your money profile is ready'), findsOneWidget);
@@ -441,6 +481,8 @@ void main() {
         350,
         scrollable: find.byType(Scrollable).first,
       );
+      await tester.ensureVisible(find.text('Groceries').first);
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Groceries').first);
       await tester.pumpAndSettle();
       expect(find.text('Transactions'), findsOneWidget);

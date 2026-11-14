@@ -394,28 +394,6 @@ class _HomeScreenState extends State<HomeScreen> {
     if (mounted) setState(() {});
   }
 
-  Future<void> _openProfile() async {
-    await Navigator.push<void>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ProfileScreen(
-          userId: widget.repository.userId,
-          userName: widget.userName,
-          email: widget.email,
-          state: state,
-          cloudReady: widget.repository.cloudReady,
-          onEditFinancialProfile: _editFinancialProfile,
-          onThemeChanged: (mode) async {
-            madsThemeMode.value = _themeModeFromString(mode);
-            await _save(state.copyWith(themeMode: mode));
-          },
-          onLogout: () => Supabase.instance.client.auth.signOut(),
-        ),
-      ),
-    );
-    if (mounted) setState(() {});
-  }
-
   Future<void> _openMads({String? initialQuestion}) async {
     await Navigator.push<void>(
       context,
@@ -431,8 +409,159 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  int _tab = 0;
+
   @override
   Widget build(BuildContext context) {
+    final Widget body = switch (_tab) {
+      1 => _boardsTab(),
+      2 => MadsConversationScreen(
+        contextData: MadsFinanceContext.fromState(state),
+        assistant:
+            widget.assistant ?? SupabaseMadsAssistant(widget.repository.client),
+      ),
+      3 => ProfileScreen(
+        userId: widget.repository.userId,
+        userName: widget.userName,
+        email: widget.email,
+        state: state,
+        cloudReady: widget.repository.cloudReady,
+        onEditFinancialProfile: _editFinancialProfile,
+        onThemeChanged: (mode) async {
+          madsThemeMode.value = _themeModeFromString(mode);
+          await _save(state.copyWith(themeMode: mode));
+        },
+        onLogout: () => Supabase.instance.client.auth.signOut(),
+      ),
+      _ => _homeTab(),
+    };
+    return Scaffold(
+      body: body,
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _tab,
+        onDestinationSelected: (index) => setState(() => _tab = index),
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home_rounded),
+            label: 'Home',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.grid_view_outlined),
+            selectedIcon: Icon(Icons.grid_view_rounded),
+            label: 'Boards',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.auto_awesome_outlined),
+            selectedIcon: Icon(Icons.auto_awesome),
+            label: 'Money Angel',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: 'Profile',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _boardsGrid(String period, String currency) => GridView.builder(
+    shrinkWrap: true,
+    physics: const NeverScrollableScrollPhysics(),
+    itemCount: state.boards.length + 1,
+    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+      crossAxisCount: 2,
+      crossAxisSpacing: 12,
+      mainAxisSpacing: 12,
+      childAspectRatio: 1.13,
+    ),
+    itemBuilder: (context, index) {
+      if (index == state.boards.length) return _addBoardTile();
+      final board = state.boards[index];
+      return _BoardTile(
+        board: board,
+        budgetMinor: state.allocationFor(board.id, period),
+        spentMinor: state.spentFor(board.id, period: period),
+        currency: currency,
+        onTap: () => _openBoard(board),
+      );
+    },
+  );
+
+  Widget _boardsTab() {
+    final period = periodOf(DateTime.now());
+    final currency = state.profile?.currency ?? 'INR';
+    return Scaffold(
+      appBar: AppBar(title: Text('Boards · ${_monthLabel(DateTime.now())}')),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(22, 8, 22, 28),
+        children: [_boardsGrid(period, currency)],
+      ),
+    );
+  }
+
+  Widget _spendingSummaryCard(String period, String currency) {
+    final totalSpent = state.boards.fold(
+      0,
+      (sum, board) => sum + state.spentFor(board.id, period: period),
+    );
+    final hasData = state.boards.isNotEmpty && totalSpent > 0;
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: scheme.surface,
+      borderRadius: BorderRadius.circular(21),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(21),
+        onTap: () => setState(() => _tab = 1),
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Row(
+            children: [
+              Icon(Icons.grid_view_rounded, color: scheme.primary),
+              const SizedBox(width: 13),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'SPENT THIS MONTH · ${_monthLabel(DateTime.now())}',
+                      style: TextStyle(
+                        color: scheme.onSurfaceVariant,
+                        fontSize: 11,
+                        letterSpacing: 1.1,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    hasData
+                        ? Text(
+                            '${Money.format(totalSpent, currency: currency)} across ${state.boards.length} boards',
+                            style: TextStyle(
+                              color: scheme.onSurface,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          )
+                        : Text(
+                            'Not enough data yet. Add your income and expenses to see your financial insights.',
+                            style: TextStyle(
+                              color: scheme.onSurfaceVariant,
+                              height: 1.4,
+                            ),
+                          ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _homeTab() {
     final profile = state.profile;
     final period = periodOf(DateTime.now());
     final currency = profile?.currency ?? 'INR';
@@ -446,140 +575,86 @@ class _HomeScreenState extends State<HomeScreen> {
         ? 'there'
         : fullName.split(RegExp(r'\s+')).first;
 
-    return Scaffold(
-      body: SafeArea(
-        child: CustomScrollView(
-          physics: const ClampingScrollPhysics(),
-          slivers: [
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(22, 16, 22, 28),
-              sliver: SliverList.list(
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'MADS.',
-                              style: Theme.of(context).textTheme.titleLarge
-                                  ?.copyWith(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .primary,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 1.1,
-                                  ),
+    return SafeArea(
+      child: CustomScrollView(
+        physics: const ClampingScrollPhysics(),
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(22, 16, 22, 28),
+            sliver: SliverList.list(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'MADS.',
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 1.1,
+                                ),
+                          ),
+                          Text(
+                            'Your finance pal.',
+                            style: TextStyle(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                              fontSize: 12,
                             ),
-                            Text(
-                              'Your finance pal.',
-                              style: TextStyle(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurfaceVariant,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                      IconButton.filledTonal(
-                        tooltip: 'Your profile and settings',
-                        onPressed: _openProfile,
-                        icon: const Icon(Icons.person_outline),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Hi, $firstName!',
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurface,
-                      fontWeight: FontWeight.w800,
                     ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'Hi, $firstName!',
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontWeight: FontWeight.w800,
                   ),
-                  const SizedBox(height: 5),
-                  Text(
-                    'Your money, organised for the month.',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  'Your money, organised for the month.',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
-                  const SizedBox(height: 20),
-                  _incomeCard(profile, currency),
-                  const SizedBox(height: 16),
-                  _madsCard(firstName, profile != null),
-                  const SizedBox(height: 23),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Your expense boards',
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(
-                                color: Theme.of(context).colorScheme.onSurface,
-                                fontWeight: FontWeight.w700,
-                              ),
-                        ),
-                      ),
-                      Text(
-                        _monthLabel(DateTime.now()),
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
+                ),
+                const SizedBox(height: 20),
+                _incomeCard(profile, currency),
+                const SizedBox(height: 16),
+                _madsCard(firstName, profile != null),
+                const SizedBox(height: 16),
+                _spendingSummaryCard(period, currency),
+                const SizedBox(height: 16),
+                _safeToSpendCard(profile, currency),
+                const SizedBox(height: 14),
+                if (unallocated != null)
+                  _allocationSummary(
+                    allocated: totalAllocated,
+                    pool: planPool!,
+                    remaining: unallocated,
+                    currency: currency,
                   ),
-                  const SizedBox(height: 11),
-                  GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: state.boards.length + 1,
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
-                          childAspectRatio: 1.13,
-                        ),
-                    itemBuilder: (context, index) {
-                      if (index == state.boards.length) return _addBoardTile();
-                      final board = state.boards[index];
-                      final budget = state.allocationFor(board.id, period);
-                      final spent = state.spentFor(board.id, period: period);
-                      return _BoardTile(
-                        board: board,
-                        budgetMinor: budget,
-                        spentMinor: spent,
-                        currency: currency,
-                        onTap: () => _openBoard(board),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 19),
-                  _safeToSpendCard(profile, currency),
-                  const SizedBox(height: 14),
-                  if (unallocated != null)
-                    _allocationSummary(
-                      allocated: totalAllocated,
-                      pool: planPool!,
-                      remaining: unallocated,
-                      currency: currency,
-                    ),
-                  const SizedBox(height: 14),
-                  _recentTransactions(currency),
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    onPressed: _spendCheck,
-                    icon: const Icon(Icons.shopping_cart_outlined),
-                    label: const Text('Check before you buy'),
-                  ),
-                ],
-              ),
+                const SizedBox(height: 14),
+                _recentTransactions(currency),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: _spendCheck,
+                  icon: const Icon(Icons.shopping_cart_outlined),
+                  label: const Text('Check before you buy'),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
