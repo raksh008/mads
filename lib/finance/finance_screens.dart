@@ -198,7 +198,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'MEVORA.',
+                  'MADS.',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     color: Theme.of(context).colorScheme.primary,
                     fontWeight: FontWeight.w900,
@@ -283,7 +283,7 @@ class HomeScreen extends StatefulWidget {
   final FinanceState initialState;
   final String? userName;
   final String? email;
-  final MevoraAssistant? assistant;
+  final MadsAssistant? assistant;
 
   const HomeScreen({
     super.key,
@@ -416,15 +416,15 @@ class _HomeScreenState extends State<HomeScreen> {
     if (mounted) setState(() {});
   }
 
-  Future<void> _openMevora({String? initialQuestion}) async {
+  Future<void> _openMads({String? initialQuestion}) async {
     await Navigator.push<void>(
       context,
       MaterialPageRoute(
-        builder: (_) => MevoraConversationScreen(
-          contextData: MevoraFinanceContext.fromState(state),
+        builder: (_) => MadsConversationScreen(
+          contextData: MadsFinanceContext.fromState(state),
           assistant:
               widget.assistant ??
-              SupabaseMevoraAssistant(widget.repository.client),
+              SupabaseMadsAssistant(widget.repository.client),
           initialQuestion: initialQuestion,
         ),
       ),
@@ -462,7 +462,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'MEVORA.',
+                              'MADS.',
                               style: Theme.of(context).textTheme.titleLarge
                                   ?.copyWith(
                                     color: Theme.of(context)
@@ -509,7 +509,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 20),
                   _incomeCard(profile, currency),
                   const SizedBox(height: 16),
-                  _mevoraCard(firstName, profile != null),
+                  _madsCard(firstName, profile != null),
                   const SizedBox(height: 23),
                   Row(
                     children: [
@@ -644,7 +644,7 @@ class _HomeScreenState extends State<HomeScreen> {
     ),
   );
 
-  Widget _mevoraCard(String firstName, bool hasProfile) => Container(
+  Widget _madsCard(String firstName, bool hasProfile) => Container(
     padding: const EdgeInsets.all(18),
     decoration: BoxDecoration(
       color: Theme.of(context).colorScheme.surface,
@@ -666,7 +666,9 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(width: 11),
             Expanded(
               child: Text(
-                hasProfile ? 'MEVORA is here, $firstName' : 'MEVORA is here',
+                hasProfile
+                    ? 'Money Angel is here, $firstName'
+                    : 'Money Angel is here',
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.onSurface,
                   fontWeight: FontWeight.w700,
@@ -692,21 +694,20 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             ActionChip(
               label: const Text('Where is most of my money going?'),
-              onPressed: () => _openMevora(
+              onPressed: () => _openMads(
                 initialQuestion: 'Where is most of my money going?',
               ),
             ),
             ActionChip(
               label: const Text('Help me plan my month'),
-              onPressed: () => _openMevora(
-                initialQuestion: 'Can you help me plan my month?',
-              ),
+              onPressed: () =>
+                  _openMads(initialQuestion: 'Can you help me plan my month?'),
             ),
           ],
         ),
         const SizedBox(height: 4),
         TextButton.icon(
-          onPressed: _openMevora,
+          onPressed: _openMads,
           icon: const Icon(Icons.chat_bubble_outline),
           label: const Text('Start a conversation'),
         ),
