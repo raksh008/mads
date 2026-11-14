@@ -630,7 +630,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 20),
                 _incomeCard(profile, currency),
                 const SizedBox(height: 16),
-                _madsCard(firstName, profile != null),
+                _madsCard(profile, period, currency),
                 const SizedBox(height: 16),
                 _spendingSummaryCard(period, currency),
                 const SizedBox(height: 16),
@@ -719,76 +719,63 @@ class _HomeScreenState extends State<HomeScreen> {
     ),
   );
 
-  Widget _madsCard(String firstName, bool hasProfile) => Container(
-    padding: const EdgeInsets.all(18),
-    decoration: BoxDecoration(
-      color: Theme.of(context).colorScheme.surface,
-      borderRadius: BorderRadius.circular(21),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            CircleAvatar(
-              backgroundColor: Theme.of(context).colorScheme.primary
-                  .withValues(alpha: 0.1),
-              child: Icon(
-                Icons.auto_awesome,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-            ),
-            const SizedBox(width: 11),
-            Expanded(
-              child: Text(
-                hasProfile
-                    ? 'Money Angel is here, $firstName'
-                    : 'Money Angel is here',
+  Widget _madsCard(FinancialProfile? profile, String period, String currency) {
+    final scheme = Theme.of(context).colorScheme;
+    ExpenseBoard? topBoard;
+    var topSpent = 0;
+    var totalSpent = 0;
+    for (final board in state.boards) {
+      final spent = state.spentFor(board.id, period: period);
+      totalSpent += spent;
+      if (spent > topSpent) {
+        topSpent = spent;
+        topBoard = board;
+      }
+    }
+    final hasData = profile != null && topBoard != null && totalSpent > 0;
+    final insight = hasData
+        ? 'Most of your spending this month is on ${topBoard.name}: '
+              '${Money.format(topSpent, currency: currency)} of '
+              '${Money.format(totalSpent, currency: currency)}.'
+        : 'Not enough data yet. Add your income and expenses to see your '
+              'financial insights.';
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(21),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.auto_awesome, color: scheme.primary, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Money Angel',
                 style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface,
+                  color: scheme.onSurface,
                   fontWeight: FontWeight.w700,
                 ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Text(
-          hasProfile
-              ? "How's your month going? Ask me anything about your money."
-              : "Add your money profile when you're ready, or start by asking me a question.",
-          style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-            height: 1.4,
+            ],
           ),
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 6,
-          children: [
-            ActionChip(
-              label: const Text('Where is most of my money going?'),
-              onPressed: () => _openMads(
-                initialQuestion: 'Where is most of my money going?',
-              ),
-            ),
-            ActionChip(
-              label: const Text('Help me plan my month'),
-              onPressed: () =>
-                  _openMads(initialQuestion: 'Can you help me plan my month?'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        TextButton.icon(
-          onPressed: _openMads,
-          icon: const Icon(Icons.chat_bubble_outline),
-          label: const Text('Start a conversation'),
-        ),
-      ],
-    ),
-  );
+          const SizedBox(height: 8),
+          Text(
+            insight,
+            style: TextStyle(color: scheme.onSurfaceVariant, height: 1.4),
+          ),
+          const SizedBox(height: 10),
+          FilledButton.tonalIcon(
+            onPressed: _openMads,
+            icon: const Icon(Icons.chat_bubble_outline, size: 18),
+            label: const Text('Ask Money Angel'),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _safeToSpendCard(FinancialProfile? profile, String currency) {
     final amount = state.safeToSpendMinor;

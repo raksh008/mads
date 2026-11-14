@@ -306,26 +306,11 @@ class FinanceRepository {
           .upsert(
             state.transactions
                 .map(
-                  (transaction) => {
-                    'id': transaction.id,
-                    'user_id': userId,
-                    'board_id': transaction.boardId,
-                    'description': transaction.description,
-                    'amount_minor': transaction.amountMinor,
-                    'currency': state.profile?.currency ?? 'INR',
-                    'transaction_kind': transaction.kind.name,
-                    'status': transaction.status.name,
-                    'merchant_key': transaction.merchantKey,
-                    'icon_key': transaction.iconKey,
-                    'logo_url': transaction.logoUrl,
-                    'accent_color':
-                        '#${transaction.accentColor.toRadixString(16).padLeft(8, '0').substring(2)}',
-                    'source': transaction.source,
-                    'external_id': transaction.externalId,
-                    'occurred_at': transaction.occurredAt
-                        .toUtc()
-                        .toIso8601String(),
-                  },
+                  (transaction) => transactionToCloudRow(
+                    transaction,
+                    userId: userId,
+                    currency: state.profile?.currency ?? 'INR',
+                  ),
                 )
                 .toList(),
             onConflict: 'id',
@@ -366,17 +351,45 @@ class FinanceRepository {
     );
   }
 
-  FinanceTransaction _transactionFromCloud(dynamic value) {
-    final row = Map<String, dynamic>.from(value as Map);
-    return FinanceTransaction(
+  FinanceTransaction _transactionFromCloud(dynamic value) =>
+      transactionFromCloudRow(Map<String, dynamic>.from(value as Map));
+}
+
+/// Cloud row for a transaction. `transaction_kind` uses the enum names
+/// (expense, refund, income, transfer), the same names read back below.
+Map<String, dynamic> transactionToCloudRow(
+  FinanceTransaction transaction, {
+  required String userId,
+  required String currency,
+}) => {
+  'id': transaction.id,
+  'user_id': userId,
+  'board_id': transaction.boardId,
+  'description': transaction.description,
+  'amount_minor': transaction.amountMinor,
+  'currency': currency,
+  'transaction_kind': transaction.kind.name,
+  'status': transaction.status.name,
+  'merchant_key': transaction.merchantKey,
+  'icon_key': transaction.iconKey,
+  'logo_url': transaction.logoUrl,
+  'accent_color':
+      '#${transaction.accentColor.toRadixString(16).padLeft(8, '0').substring(2)}',
+  'source': transaction.source,
+  'external_id': transaction.externalId,
+  'occurred_at': transaction.occurredAt.toUtc().toIso8601String(),
+};
+
+FinanceTransaction transactionFromCloudRow(Map<String, dynamic> row) =>
+    FinanceTransaction(
       id: '${row['id']}',
       boardId: '${row['board_id']}',
       description: '${row['description']}',
       amountMinor: _asInt(row['amount_minor']),
       occurredAt: DateTime.tryParse('${row['occurred_at']}') ?? DateTime.now(),
-      kind: row['transaction_kind'] == 'refund'
-          ? TransactionKind.refund
-          : TransactionKind.expense,
+      kind:
+          TransactionKind.values.asNameMap()[row['transaction_kind']] ??
+          TransactionKind.expense,
       status: row['status'] == 'pending'
           ? TransactionStatus.pending
           : TransactionStatus.posted,
@@ -387,8 +400,6 @@ class FinanceRepository {
       source: row['source'] as String? ?? 'manual',
       externalId: row['external_id'] as String?,
     );
-  }
-}
 
 class CatalogResolution {
   final String iconKey;

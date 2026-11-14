@@ -165,7 +165,7 @@ class BudgetAllocation {
       );
 }
 
-enum TransactionKind { expense, refund }
+enum TransactionKind { expense, refund, income, transfer }
 
 enum TransactionStatus { posted, pending }
 
@@ -199,6 +199,14 @@ class FinanceTransaction {
     this.source = 'manual',
     this.externalId,
   });
+
+  /// How this transaction changes spending: expenses add, refunds subtract,
+  /// and income and transfers never count as spending.
+  int get spendingEffectMinor => switch (kind) {
+    TransactionKind.expense => amountMinor,
+    TransactionKind.refund => -amountMinor,
+    TransactionKind.income || TransactionKind.transfer => 0,
+  };
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -285,13 +293,7 @@ class FinanceState {
               item.status == TransactionStatus.posted &&
               _calendarDate(item.occurredAt).isAfter(snapshotDate),
         )
-        .fold(
-          0,
-          (sum, item) =>
-              sum +
-              item.amountMinor *
-                  (item.kind == TransactionKind.expense ? 1 : -1),
-        );
+        .fold(0, (sum, item) => sum + item.spendingEffectMinor);
   }
 
   int? get safeToSpendMinor {
@@ -309,12 +311,7 @@ class FinanceState {
         if (period != null && periodOf(item.occurredAt) != period) return false;
         return true;
       })
-      .fold(
-        0,
-        (sum, item) =>
-            sum +
-            item.amountMinor * (item.kind == TransactionKind.expense ? 1 : -1),
-      );
+      .fold(0, (sum, item) => sum + item.spendingEffectMinor);
 
   Map<String, dynamic> toJson() => {
     'version': 2,

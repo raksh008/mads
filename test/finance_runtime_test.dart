@@ -76,6 +76,59 @@ FinanceState _state({String themeMode = 'system'}) =>
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  group('transaction kinds', () {
+    FinanceTransaction tx(TransactionKind kind, int amount) =>
+        FinanceTransaction(
+          id: 'tx-${kind.name}',
+          boardId: 'groceries',
+          description: kind.name,
+          amountMinor: amount,
+          occurredAt: DateTime(2026, 11, 13),
+          kind: kind,
+        );
+
+    test('every kind survives toJson/fromJson', () {
+      for (final kind in TransactionKind.values) {
+        final back = FinanceTransaction.fromJson(tx(kind, 1_000).toJson());
+        expect(back.kind, kind);
+      }
+    });
+
+    test('every kind survives the cloud mapping', () {
+      for (final kind in TransactionKind.values) {
+        final row = transactionToCloudRow(
+          tx(kind, 1_000),
+          userId: 'user-1',
+          currency: 'INR',
+        );
+        expect(row['transaction_kind'], kind.name);
+        expect(transactionFromCloudRow(row).kind, kind);
+      }
+    });
+
+    test('income and transfer do not change spending or safe-to-spend', () {
+      final base = _state().copyWith(
+        transactions: [
+          tx(TransactionKind.expense, 50_000),
+          tx(TransactionKind.refund, 10_000),
+        ],
+      );
+      final withOthers = base.copyWith(
+        transactions: [
+          ...base.transactions,
+          tx(TransactionKind.income, 7_000_000),
+          tx(TransactionKind.transfer, 25_000),
+        ],
+      );
+
+      expect(base.spentFor('groceries'), 40_000);
+      expect(withOthers.spentFor('groceries'), 40_000);
+      expect(withOthers.transactionsSinceBalanceSnapshotMinor, 40_000);
+      expect(withOthers.safeToSpendMinor, base.safeToSpendMinor);
+      expect(withOthers.safeToSpendMinor, 300_000 - 40_000);
+    });
+  });
+
   group('finance display audit', () {
     test('monthly plan excludes legacy commitments and reconciles', () {
       final state = _state().copyWith(
@@ -376,11 +429,11 @@ void main() {
     expect(find.text('Your finance pal.'), findsOneWidget);
     expect(find.text('Hi, Test!'), findsOneWidget);
     expect(find.text('Your money, organised for the month.'), findsOneWidget);
-    expect(find.text('Money Angel is here, Test'), findsOneWidget);
+    expect(find.text('Ask Money Angel'), findsOneWidget);
 
-    await tester.ensureVisible(find.text('Start a conversation'));
+    await tester.ensureVisible(find.text('Ask Money Angel'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Start a conversation'));
+    await tester.tap(find.text('Ask Money Angel'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Your money profile is ready'), findsOneWidget);
     expect(find.text('Money Angel'), findsOneWidget);
