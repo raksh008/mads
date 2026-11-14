@@ -410,6 +410,46 @@ void main() {
     expect(find.text('−₹5,000'), findsNothing);
   });
 
+  testWidgets('rent board records rent once and Home includes it', (
+    tester,
+  ) async {
+    final repository = _FakeFinanceRepository(_state());
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HomeScreen(
+          repository: repository,
+          initialState: repository.state,
+          userName: 'Test User',
+          assistant: _FakeMadsAssistant(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Boards'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Rent'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Rent'));
+    await tester.pumpAndSettle();
+    expect(find.text('Add expense'), findsNothing);
+
+    await tester.tap(find.text('Add rent paid'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField).last, '15000');
+    await tester.tap(find.text('Save rent'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Add rent paid'), findsNothing);
+    expect(find.text('−₹15,000'), findsOneWidget);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Home'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('₹15,000 across'), findsOneWidget);
+  });
+
   testWidgets('bottom navigation switches between home tabs', (tester) async {
     final repository = _FakeFinanceRepository(_state());
     await tester.pumpWidget(

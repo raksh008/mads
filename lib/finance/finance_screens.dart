@@ -1255,6 +1255,44 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
     );
   }
 
+  bool get _isRent =>
+      widget.board.iconKey == 'home' ||
+      normalizeName(widget.board.name) == 'rent';
+
+  FinanceTransaction? get _rentThisMonth {
+    for (final item in transactions) {
+      if (item.kind == TransactionKind.expense &&
+          item.status == TransactionStatus.posted &&
+          normalizeName(item.description) == 'rent') {
+        return item;
+      }
+    }
+    return null;
+  }
+
+  Future<void> _addRentPaid() async {
+    final amount = await showDialog<int>(
+      context: context,
+      builder: (_) => _RentAmountDialog(
+        initialAmount: budget > 0 ? _minorInput(budget) : '',
+      ),
+    );
+    if (amount == null || !mounted || _rentThisMonth != null) return;
+    final transaction = FinanceTransaction(
+      id: newId(),
+      boardId: widget.board.id,
+      description: 'Rent',
+      amountMinor: amount,
+      occurredAt: DateTime.now(),
+      iconKey: widget.board.iconKey,
+      logoUrl: widget.board.logoUrl,
+      accentColor: widget.board.accentColor,
+    );
+    await _persist(
+      state.copyWith(transactions: [transaction, ...state.transactions]),
+    );
+  }
+
   Future<void> _importCsv() async {
     final controller = TextEditingController();
     final csv = await showDialog<String>(
@@ -1526,19 +1564,28 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
                         ?.copyWith(color: ink, fontWeight: FontWeight.w700),
                   ),
                 ),
-                IconButton(
-                  tooltip: 'Import CSV statement',
-                  onPressed: _importCsv,
-                  icon: const Icon(Icons.upload_file_outlined),
-                ),
-                FilledButton.tonalIcon(
-                  onPressed: () => _addTransaction(),
-                  icon: const Icon(Icons.add),
-                  label: const Text('Add expense'),
-                ),
+                if (_isRent) ...[
+                  if (_rentThisMonth == null)
+                    FilledButton.tonalIcon(
+                      onPressed: _addRentPaid,
+                      icon: const Icon(Icons.add),
+                      label: const Text('Add rent paid'),
+                    ),
+                ] else ...[
+                  IconButton(
+                    tooltip: 'Import CSV statement',
+                    onPressed: _importCsv,
+                    icon: const Icon(Icons.upload_file_outlined),
+                  ),
+                  FilledButton.tonalIcon(
+                    onPressed: () => _addTransaction(),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add expense'),
+                  ),
+                ],
               ],
             ),
-            if (suggestions.isNotEmpty) ...[
+            if (!_isRent && suggestions.isNotEmpty) ...[
               const SizedBox(height: 11),
               const Text('Quick add', style: TextStyle(color: Colors.black54)),
               const SizedBox(height: 7),
@@ -1751,6 +1798,64 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
 
   bool _wouldOverallocate(int currentTotal, int? pool) =>
       pool != null && _proposedTotal(currentTotal) > pool;
+}
+
+/// Rent board: asks only for the amount paid this month.
+class _RentAmountDialog extends StatefulWidget {
+  final String initialAmount;
+  const _RentAmountDialog({required this.initialAmount});
+
+  @override
+  State<_RentAmountDialog> createState() => _RentAmountDialogState();
+}
+
+class _RentAmountDialogState extends State<_RentAmountDialog> {
+  final formKey = GlobalKey<FormState>();
+  late final TextEditingController amountController = TextEditingController(
+    text: widget.initialAmount,
+  );
+
+  @override
+  void dispose() {
+    amountController.dispose();
+    super.dispose();
+  }
+
+  void save() {
+    if (!formKey.currentState!.validate()) return;
+    Navigator.pop(context, Money.parseMinor(amountController.text.trim()));
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Add rent paid'),
+    content: Form(
+      key: formKey,
+      child: TextFormField(
+        controller: amountController,
+        autofocus: true,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        decoration: const InputDecoration(
+          labelText: 'Rent amount',
+          prefixText: '₹ ',
+        ),
+        validator: (value) {
+          final amount = value == null ? null : Money.parseMinor(value);
+          return amount == null || amount <= 0
+              ? 'Enter an amount above ₹0.'
+              : null;
+        },
+        onFieldSubmitted: (_) => save(),
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Cancel'),
+      ),
+      FilledButton(onPressed: save, child: const Text('Save rent')),
+    ],
+  );
 }
 
 class _TransactionEntry {
