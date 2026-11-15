@@ -2,6 +2,8 @@
 
 MADS is a Flutter personal finance companion with Supabase authentication, monthly expense boards, budgets, and a transaction ledger.
 
+**Website:** https://raksh008.github.io/mads-website/
+
 ## Run the app
 
 ```sh
