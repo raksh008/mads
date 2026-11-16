@@ -160,7 +160,7 @@ class _BankMessagesScreenState extends State<BankMessagesScreen> {
       const Text(
         'Paste one or more bank or UPI SMS messages. They are read on this '
         'phone only, and the text is never saved or uploaded.',
-        style: TextStyle(color: Colors.black54, height: 1.45),
+        style: TextStyle(color: madsMutedText, height: 1.45),
       ),
       const SizedBox(height: 14),
       TextField(
@@ -203,7 +203,7 @@ class _BankMessagesScreenState extends State<BankMessagesScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 18),
             child: Text(
               reviewMessage!,
-              style: const TextStyle(color: coral, fontWeight: FontWeight.w600),
+              style: const TextStyle(color: madsDanger, fontWeight: FontWeight.w600),
             ),
           ),
         Padding(
@@ -233,7 +233,7 @@ class _BankMessagesScreenState extends State<BankMessagesScreen> {
     if (!parsed.readable) {
       return Card(
         child: ListTile(
-          leading: const Icon(Icons.help_outline, color: coral),
+          leading: const Icon(Icons.help_outline, color: madsDanger),
           title: const Text("Couldn't read this message"),
           subtitle: Text(parsed.preview),
         ),
@@ -267,13 +267,13 @@ class _BankMessagesScreenState extends State<BankMessagesScreen> {
                   Text(
                     '${parsed.isDebit! ? 'Debit −' : 'Credit +'}$amount · '
                     '$dateLabel',
-                    style: const TextStyle(color: Colors.black54, fontSize: 12),
+                    style: const TextStyle(color: madsMutedText, fontSize: 12),
                   ),
                   if (row.duplicate)
                     const Text(
                       'Already added',
                       style: TextStyle(
-                        color: Colors.black45,
+                        color: madsFaintText,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),

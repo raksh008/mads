@@ -945,7 +945,7 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF0E6B55), Color(0xFF164D57)],
+          colors: [Color(0xFF0D3556), madsNavy],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -1079,7 +1079,7 @@ class _HomeScreenState extends State<HomeScreen> {
         Text(
           'Recent activity',
           style: Theme.of(context).textTheme.titleLarge
-              ?.copyWith(color: ink, fontWeight: FontWeight.w700),
+              ?.copyWith(color: madsSoftWhite, fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 8),
         if (items.isEmpty)
@@ -1087,7 +1087,7 @@ class _HomeScreenState extends State<HomeScreen> {
             padding: EdgeInsets.symmetric(vertical: 18),
             child: Text(
               'Your expenses will show here as you add them to a board.',
-              style: TextStyle(color: Colors.black54),
+              style: TextStyle(color: madsMutedText),
             ),
           )
         else
@@ -1105,7 +1105,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     : BoardIconView(
                         iconKey: board?.iconKey ?? 'category',
                         accentColor:
-                            board?.accentColor ?? forestGreen.toARGB32(),
+                            board?.accentColor ?? madsBlue.toARGB32(),
                         logoUrl: board?.logoUrl,
                         size: 22,
                       ),
@@ -1136,7 +1136,7 @@ class _HomeScreenState extends State<HomeScreen> {
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.75),
           border: Border.all(
-            color: forestGreen.withValues(alpha: 0.25),
+            color: madsBlue.withValues(alpha: 0.25),
             width: 1.4,
           ),
           borderRadius: BorderRadius.circular(20),
@@ -1148,15 +1148,15 @@ class _HomeScreenState extends State<HomeScreen> {
               width: 46,
               height: 46,
               decoration: const BoxDecoration(
-                color: forestGreen,
+                color: madsBlue,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.add, color: Colors.white, size: 28),
+              child: const Icon(Icons.add, color: madsBackground, size: 28),
             ),
             const SizedBox(height: 10),
             const Text(
               'Add board',
-              style: TextStyle(color: forestGreen, fontWeight: FontWeight.w700),
+              style: TextStyle(color: madsBlue, fontWeight: FontWeight.w700),
             ),
           ],
         ),
@@ -1241,7 +1241,7 @@ class _BoardTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final (statusText, statusColor) = inPlan
         ? _boardStatus(board, budgetMinor, spentMinor, currency)
-        : ('Not in plan', Colors.black45);
+        : ('Not in plan', madsFaintText);
     return Material(
       color: Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(20),
@@ -1268,14 +1268,14 @@ class _BoardTile extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color: ink,
+                      color: madsSoftWhite,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     '${Money.format(spentMinor, currency: currency)} spent',
-                    style: const TextStyle(color: Colors.black54, fontSize: 12),
+                    style: const TextStyle(color: madsMutedText, fontSize: 12),
                   ),
                   Text(
                     statusText,
@@ -1749,7 +1749,7 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
                   child: Text(
                     widget.board.name,
                     style: Theme.of(context).textTheme.headlineSmall
-                        ?.copyWith(color: ink, fontWeight: FontWeight.w800),
+                        ?.copyWith(color: madsSoftWhite, fontWeight: FontWeight.w800),
                   ),
                 ),
               ],
@@ -1757,7 +1757,7 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
             const SizedBox(height: 5),
             Text(
               'Your $month board',
-              style: const TextStyle(color: Colors.black54),
+              style: const TextStyle(color: madsMutedText),
             ),
             const SizedBox(height: 20),
             _spendingSummary(progress, remainder),
@@ -1778,7 +1778,7 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
                   child: Text(
                     'Transactions',
                     style: Theme.of(context).textTheme.titleLarge
-                        ?.copyWith(color: ink, fontWeight: FontWeight.w700),
+                        ?.copyWith(color: madsSoftWhite, fontWeight: FontWeight.w700),
                   ),
                 ),
                 if (_isRent) ...[
@@ -1804,7 +1804,7 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
             ),
             if (!_isRent && suggestions.isNotEmpty) ...[
               const SizedBox(height: 11),
-              const Text('Quick add', style: TextStyle(color: Colors.black54)),
+              const Text('Quick add', style: TextStyle(color: madsMutedText)),
               const SizedBox(height: 7),
               Wrap(
                 spacing: 7,
@@ -1828,12 +1828,12 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
                     Icon(
                       Icons.receipt_long_outlined,
                       size: 34,
-                      color: Colors.black38,
+                      color: madsFaintText,
                     ),
                     SizedBox(height: 8),
                     Text(
                       'No transactions this month yet.',
-                      style: TextStyle(color: Colors.black54),
+                      style: TextStyle(color: madsMutedText),
                     ),
                   ],
                 ),
@@ -1858,7 +1858,7 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
         const Text(
           'SPENT THIS MONTH',
           style: TextStyle(
-            color: Colors.black54,
+            color: madsMutedText,
             fontSize: 11,
             letterSpacing: 1.1,
             fontWeight: FontWeight.w600,
@@ -1868,7 +1868,7 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
         Text(
           Money.format(spent, currency: currency),
           style: const TextStyle(
-            color: ink,
+            color: madsSoftWhite,
             fontSize: 28,
             fontWeight: FontWeight.w800,
           ),
@@ -1880,7 +1880,7 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
                     ? 'Set the bill amount to track if it is paid.'
                     : 'Set a monthly budget to see what remains.')
               : 'of ${Money.format(budget, currency: currency)} planned',
-          style: const TextStyle(color: Colors.black54),
+          style: const TextStyle(color: madsMutedText),
         ),
         if (budget > 0) ...[
           const SizedBox(height: 13),
@@ -1889,8 +1889,8 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
             child: LinearProgressIndicator(
               value: progress,
               minHeight: 9,
-              color: remainder < 0 ? coral : forestGreen,
-              backgroundColor: forestGreen.withValues(alpha: 0.12),
+              color: remainder < 0 ? madsDanger : madsBlue,
+              backgroundColor: madsBlue.withValues(alpha: 0.12),
             ),
           ),
           const SizedBox(height: 8),
@@ -1918,7 +1918,7 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
     child: Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFFEAF3EE),
+        color: madsSurfaceHigh,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
@@ -1927,7 +1927,7 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
           Text(
             '$month plan',
             style: const TextStyle(
-              color: ink,
+              color: madsSoftWhite,
               fontSize: 17,
               fontWeight: FontWeight.w700,
             ),
@@ -1935,7 +1935,7 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
           const SizedBox(height: 4),
           Text(
             'Set the amount you want for ${widget.board.name}. This is a plan; actual purchases are recorded below.',
-            style: const TextStyle(color: Colors.black54, height: 1.4),
+            style: const TextStyle(color: madsMutedText, height: 1.4),
           ),
           const SizedBox(height: 13),
           TextFormField(
@@ -1959,7 +1959,7 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
             Text(
               'With this amount, all boards will have ${Money.format(_proposedTotal(allocationTotal), currency: currency)} planned against a ${Money.format(pool!, currency: currency)} pool. You can still save it; review the total plan on your home screen.',
               style: const TextStyle(
-                color: Color(0xFF9C4A37),
+                color: madsDanger,
                 height: 1.35,
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
@@ -2029,7 +2029,7 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
           Expanded(
             child: Text(
               'Due ${_shortDateLabel(due)} each month',
-              style: const TextStyle(color: Colors.black54),
+              style: const TextStyle(color: madsMutedText),
             ),
           ),
       ],
@@ -2077,7 +2077,7 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
   Widget _planQuestion() => Container(
     padding: const EdgeInsets.all(18),
     decoration: BoxDecoration(
-      color: const Color(0xFFEAF3EE),
+      color: madsSurfaceHigh,
       borderRadius: BorderRadius.circular(20),
     ),
     child: Column(
@@ -2086,7 +2086,7 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
         Text(
           'Include ${widget.board.name} in the $month plan?',
           style: const TextStyle(
-            color: ink,
+            color: madsSoftWhite,
             fontSize: 15,
             fontWeight: FontWeight.w700,
           ),
@@ -2107,7 +2107,7 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
           const SizedBox(height: 8),
           const Text(
             "Not in this month's plan. Spending here is still recorded.",
-            style: TextStyle(color: Colors.black54),
+            style: TextStyle(color: madsMutedText),
           ),
         ],
       ],
@@ -2125,13 +2125,13 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
                 size: 23,
               )
             : CircleAvatar(
-                backgroundColor: forestGreen.withValues(alpha: 0.1),
+                backgroundColor: madsBlue.withValues(alpha: 0.1),
                 child: Icon(switch (transaction.kind) {
                   TransactionKind.expense => Icons.receipt_long_outlined,
                   TransactionKind.refund => Icons.undo_rounded,
                   TransactionKind.income => Icons.south_west_rounded,
                   TransactionKind.transfer => Icons.swap_horiz_rounded,
-                }, color: forestGreen),
+                }, color: madsBlue),
               ),
         title: Text(transaction.description),
         subtitle: Text(
@@ -2420,18 +2420,18 @@ class _AddExpenseBoardScreenState extends State<AddExpenseBoardScreen> {
             const Icon(
               Icons.dashboard_customize_outlined,
               size: 45,
-              color: forestGreen,
+              color: madsBlue,
             ),
             const SizedBox(height: 15),
             Text(
               'Create an expense board',
               style: Theme.of(context).textTheme.headlineSmall
-                  ?.copyWith(color: ink, fontWeight: FontWeight.w800),
+                  ?.copyWith(color: madsSoftWhite, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 8),
             const Text(
               'Give it a name. MADS matches it to a category and icon automatically.',
-              style: TextStyle(color: Colors.black54, height: 1.5),
+              style: TextStyle(color: madsMutedText, height: 1.5),
             ),
             const SizedBox(height: 22),
             TextFormField(
@@ -2470,7 +2470,7 @@ class _AddExpenseBoardScreenState extends State<AddExpenseBoardScreen> {
               type == BoardType.bill
                   ? 'A fixed amount with a due date, like rent or electricity.'
                   : 'A rough monthly limit, like groceries or shopping.',
-              style: const TextStyle(color: Colors.black54),
+              style: const TextStyle(color: madsMutedText),
             ),
             if (type == BoardType.bill) ...[
               const SizedBox(height: 10),
@@ -2566,19 +2566,19 @@ class _DueDayDialogState extends State<_DueDayDialog> {
   String money(int minor) => Money.format(minor, currency: currency);
   final left = plannedMinor - spentMinor;
   if (board.type == BoardType.bill) {
-    if (plannedMinor == 0) return ('Amount not set', Colors.black45);
-    if (left <= 0) return ('Paid ✓', forestGreen);
+    if (plannedMinor == 0) return ('Amount not set', madsFaintText);
+    if (left <= 0) return ('Paid ✓', madsBlue);
     final due = board.dueDateIn(DateTime.now());
     return (
       due == null
           ? 'Due ${money(left)}'
           : 'Due ${money(left)} · ${_shortDateLabel(due)}',
-      coral,
+      madsDanger,
     );
   }
-  if (plannedMinor == 0) return ('Budget not set', forestGreen);
-  if (left < 0) return ('Over budget by ${money(-left)}', coral);
-  return ('${money(left)} left of ${money(plannedMinor)}', forestGreen);
+  if (plannedMinor == 0) return ('Budget not set', madsBlue);
+  if (left < 0) return ('Over budget by ${money(-left)}', madsDanger);
+  return ('${money(left)} left of ${money(plannedMinor)}', madsBlue);
 }
 
 class ProfileScreen extends StatelessWidget {
@@ -2616,11 +2616,11 @@ class ProfileScreen extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 34,
-            backgroundColor: forestGreen.withValues(alpha: 0.1),
+            backgroundColor: madsBlue.withValues(alpha: 0.1),
             child: Text(
               name.substring(0, 1).toUpperCase(),
               style: const TextStyle(
-                color: forestGreen,
+                color: madsBlue,
                 fontSize: 25,
                 fontWeight: FontWeight.w800,
               ),
@@ -2633,7 +2633,7 @@ class ProfileScreen extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w800,
-                color: ink,
+                color: madsSoftWhite,
               ),
             ),
           ),
@@ -2642,7 +2642,7 @@ class ProfileScreen extends StatelessWidget {
             Center(
               child: Text(
                 email!,
-                style: const TextStyle(color: Colors.black54),
+                style: const TextStyle(color: madsMutedText),
               ),
             ),
           ],
@@ -2652,7 +2652,7 @@ class ProfileScreen extends StatelessWidget {
             style: TextStyle(
               fontSize: 11,
               letterSpacing: 1.2,
-              color: Colors.black54,
+              color: madsMutedText,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -2660,7 +2660,7 @@ class ProfileScreen extends StatelessWidget {
             child: ListTile(
               leading: const Icon(
                 Icons.account_balance_wallet_outlined,
-                color: forestGreen,
+                color: madsBlue,
               ),
               title: const Text('Financial details'),
               subtitle: const Text(
@@ -2676,7 +2676,7 @@ class ProfileScreen extends StatelessWidget {
             style: TextStyle(
               fontSize: 11,
               letterSpacing: 1.2,
-              color: Colors.black54,
+              color: madsMutedText,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -2709,7 +2709,7 @@ class ProfileScreen extends StatelessWidget {
             style: TextStyle(
               fontSize: 11,
               letterSpacing: 1.2,
-              color: Colors.black54,
+              color: madsMutedText,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -2717,7 +2717,7 @@ class ProfileScreen extends StatelessWidget {
             child: ListTile(
               leading: Icon(
                 cloudReady ? Icons.cloud_done_outlined : Icons.phone_android,
-                color: cloudReady ? forestGreen : Colors.orange.shade800,
+                color: cloudReady ? madsBlue : madsWarning,
               ),
               title: Text(
                 cloudReady ? 'Synced to your account' : 'Saved on this device',
@@ -2731,7 +2731,7 @@ class ProfileScreen extends StatelessWidget {
           ),
           Card(
             child: ListTile(
-              leading: const Icon(Icons.home_work_outlined, color: forestGreen),
+              leading: const Icon(Icons.home_work_outlined, color: madsBlue),
               title: const Text('Household'),
               subtitle: const Text(
                 'Invite people and track expenses you choose to share',
@@ -2751,7 +2751,7 @@ class ProfileScreen extends StatelessWidget {
             child: Text(
               'MADS uses your current balance as a snapshot. Purchases are tracked separately and are not subtracted from it again.',
               style: TextStyle(
-                color: Colors.black54,
+                color: madsMutedText,
                 height: 1.45,
                 fontSize: 12,
               ),
@@ -2760,7 +2760,7 @@ class ProfileScreen extends StatelessWidget {
           const SizedBox(height: 22),
           Card(
             child: ListTile(
-              leading: const Icon(Icons.logout, color: coral),
+              leading: const Icon(Icons.logout, color: madsDanger),
               title: const Text('Log out'),
               onTap: onLogout,
             ),
@@ -3034,9 +3034,9 @@ String _signedAmount(FinanceTransaction transaction, String currency) {
 
 Color _amountColor(FinanceTransaction transaction) =>
     switch (transaction.kind) {
-      TransactionKind.expense => ink,
-      TransactionKind.refund || TransactionKind.income => forestGreen,
-      TransactionKind.transfer => Colors.black54,
+      TransactionKind.expense => madsSoftWhite,
+      TransactionKind.refund || TransactionKind.income => madsBlue,
+      TransactionKind.transfer => madsMutedText,
     };
 
 String _kindPrefix(FinanceTransaction transaction) =>

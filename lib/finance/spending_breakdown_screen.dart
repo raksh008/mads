@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../branding.dart';
 import 'finance_models.dart';
 
 /// One board's chunk of the donut and its row in the list below.
@@ -51,12 +52,12 @@ class _SpendingBreakdownScreenState extends State<SpendingBreakdownScreen>
   // Boards still on the default accent colour get one of these instead,
   // so their chunks don't merge into one block. Custom colours are kept.
   static const _boardPalette = [
-    Color(0xFF147D64), // green
+    madsBlue, // logo blue
     Color(0xFFE07A2F), // orange
     Color(0xFF7B5EA7), // purple
     Color(0xFFD64F7A), // pink
     Color(0xFFE0B03A), // amber
-    Color(0xFF2F8FD6), // blue
+    Color(0xFF2EC4B6), // teal
     Color(0xFFA0522D), // brown
     Color(0xFF6B8E23), // olive
   ];

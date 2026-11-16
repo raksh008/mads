@@ -264,13 +264,13 @@ class _HouseholdScreenState extends State<HouseholdScreen> {
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.w800,
-                color: ink,
+                color: madsSoftWhite,
               ),
             ),
             const SizedBox(height: 7),
             const Text(
               'Household members only see shared household expenses here. Your personal accounts and boards stay private.',
-              style: TextStyle(color: Colors.black54, height: 1.45),
+              style: TextStyle(color: madsMutedText, height: 1.45),
             ),
             const SizedBox(height: 17),
             Wrap(
@@ -295,7 +295,7 @@ class _HouseholdScreenState extends State<HouseholdScreen> {
                 child: Center(
                   child: Text(
                     'You are not in a household yet.',
-                    style: TextStyle(color: Colors.black54),
+                    style: TextStyle(color: madsMutedText),
                   ),
                 ),
               )
@@ -326,7 +326,7 @@ class _HouseholdScreenState extends State<HouseholdScreen> {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.home_work_outlined, color: forestGreen),
+                  const Icon(Icons.home_work_outlined, color: madsBlue),
                   const SizedBox(width: 9),
                   Expanded(
                     child: Text(
@@ -346,7 +346,7 @@ class _HouseholdScreenState extends State<HouseholdScreen> {
               ),
               const Text(
                 'Shared expenses',
-                style: TextStyle(color: Colors.black54),
+                style: TextStyle(color: madsMutedText),
               ),
               const SizedBox(height: 5),
               if (snapshot.connectionState == ConnectionState.waiting)
@@ -356,7 +356,7 @@ class _HouseholdScreenState extends State<HouseholdScreen> {
                   padding: EdgeInsets.symmetric(vertical: 12),
                   child: Text(
                     'No shared expenses yet.',
-                    style: TextStyle(color: Colors.black54),
+                    style: TextStyle(color: madsMutedText),
                   ),
                 )
               else
@@ -401,12 +401,12 @@ class _HouseholdScreenState extends State<HouseholdScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.cloud_off_outlined, color: Colors.black45, size: 38),
+          const Icon(Icons.cloud_off_outlined, color: madsFaintText, size: 38),
           const SizedBox(height: 12),
           const Text(
             'Household sharing needs the MADS database migration and an internet connection.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.black54, height: 1.45),
+            style: TextStyle(color: madsMutedText, height: 1.45),
           ),
           const SizedBox(height: 12),
           OutlinedButton(onPressed: _reload, child: const Text('Try again')),

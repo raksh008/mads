@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mads/branding.dart';
 import 'package:mads/finance/finance_models.dart';
 import 'package:mads/finance/finance_repository.dart';
 import 'package:mads/finance/finance_screens.dart';
@@ -205,7 +206,7 @@ void main() {
     final over = tester.widget<Text>(
       tileStatus('Shopping', 'Over budget by ₹2,000'),
     );
-    expect(over.style!.color, const Color(0xFFD85E58)); // red
+    expect(over.style!.color, madsDanger); // red
     expect(tileStatus('Fuel', 'Budget not set'), findsOneWidget);
   });
 }

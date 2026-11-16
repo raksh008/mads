@@ -37,55 +37,79 @@ final supabase = Supabase.instance.client;
 class MadsApp extends StatelessWidget {
   const MadsApp({super.key});
 
-  ThemeData _theme(Brightness brightness) {
-    final dark = brightness == Brightness.dark;
-    final scheme = ColorScheme.fromSeed(
-      seedColor: forestGreen,
-      brightness: brightness,
-      surface: dark ? const Color(0xFF18242A) : Colors.white,
-    );
+  // One theme, matching the logo: navy-black, soft white text, blue accent.
+  ThemeData _theme() {
+    final scheme =
+        ColorScheme.fromSeed(
+          seedColor: madsBlue,
+          brightness: Brightness.dark,
+        ).copyWith(
+          primary: madsBlue,
+          onPrimary: madsBackground,
+          primaryContainer: const Color(0xFF0D3556),
+          onPrimaryContainer: madsSoftWhite,
+          secondary: madsBlue,
+          onSecondary: madsBackground,
+          secondaryContainer: const Color(0xFF0D3556),
+          onSecondaryContainer: madsBlue,
+          surface: madsSurface,
+          onSurface: madsSoftWhite,
+          onSurfaceVariant: madsMutedText,
+          surfaceContainerLowest: madsBackground,
+          surfaceContainerLow: madsSurface,
+          surfaceContainer: madsSurface,
+          surfaceContainerHigh: madsSurfaceHigh,
+          surfaceContainerHighest: madsSurfaceHigh,
+          outline: madsOutline,
+          outlineVariant: madsOutline,
+          error: madsDanger,
+        );
     return ThemeData(
       colorScheme: scheme,
-      scaffoldBackgroundColor: dark ? const Color(0xFF101A1F) : cream,
+      scaffoldBackgroundColor: madsBackground,
       useMaterial3: true,
       fontFamily: 'Arial',
-      appBarTheme: AppBarTheme(
-        backgroundColor: dark ? const Color(0xFF101A1F) : cream,
-        foregroundColor: dark ? Colors.white : ink,
+      appBarTheme: const AppBarTheme(
+        backgroundColor: madsBackground,
+        foregroundColor: madsSoftWhite,
         elevation: 0,
+        surfaceTintColor: Colors.transparent,
       ),
       cardTheme: CardThemeData(
-        color: dark ? const Color(0xFF18242A) : Colors.white,
+        color: madsSurface,
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17)),
         margin: const EdgeInsets.only(bottom: 8),
       ),
+      navigationBarTheme: const NavigationBarThemeData(
+        backgroundColor: madsSurface,
+        surfaceTintColor: Colors.transparent,
+        indicatorColor: Color(0xFF0D3556),
+      ),
+      dividerTheme: const DividerThemeData(color: madsOutline),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: dark ? const Color(0xFF223138) : Colors.white,
+        fillColor: madsSurfaceHigh,
+        hintStyle: const TextStyle(color: madsFaintText),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: forestGreen, width: 1.5),
+          borderSide: const BorderSide(color: madsBlue, width: 1.5),
         ),
       ),
     );
   }
 
   @override
-  Widget build(BuildContext context) => ValueListenableBuilder<ThemeMode>(
-    valueListenable: madsThemeMode,
-    builder: (context, themeMode, child) => MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'MADS',
-      theme: _theme(Brightness.light),
-      darkTheme: _theme(Brightness.dark),
-      themeMode: themeMode,
-      home: const AuthGate(),
-    ),
+  Widget build(BuildContext context) => MaterialApp(
+    debugShowCheckedModeBanner: false,
+    title: 'MADS',
+    theme: _theme(),
+    themeMode: ThemeMode.dark,
+    home: const AuthGate(),
   );
 }
 
@@ -180,7 +204,7 @@ class WelcomeScreen extends StatelessWidget {
                   fontSize: 38,
                   height: 1.2,
                   fontWeight: FontWeight.bold,
-                  color: forestGreen,
+                  color: madsSoftWhite,
                 ),
               ),
 
@@ -192,7 +216,7 @@ class WelcomeScreen extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 16,
                   height: 1.5,
-                  color: Colors.black54,
+                  color: madsMutedText,
                 ),
               ),
 
@@ -209,8 +233,8 @@ class WelcomeScreen extends StatelessWidget {
                     );
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: forestGreen,
-                    foregroundColor: Colors.white,
+                    backgroundColor: madsBlue,
+                    foregroundColor: madsBackground,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(15),
                     ),
@@ -232,8 +256,8 @@ class WelcomeScreen extends StatelessWidget {
                     );
                   },
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: forestGreen,
-                    side: const BorderSide(color: forestGreen),
+                    foregroundColor: madsBlue,
+                    side: const BorderSide(color: madsBlue),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(15),
                     ),
@@ -247,7 +271,7 @@ class WelcomeScreen extends StatelessWidget {
               const Center(
                 child: Text(
                   'Your money. Your decisions.',
-                  style: TextStyle(fontSize: 12, color: Colors.black45),
+                  style: TextStyle(fontSize: 12, color: madsFaintText),
                 ),
               ),
             ],
@@ -353,7 +377,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(backgroundColor: cream, foregroundColor: forestGreen),
+      appBar: AppBar(),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(25),
@@ -368,7 +392,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 fontSize: 32,
                 height: 1.2,
                 fontWeight: FontWeight.bold,
-                color: forestGreen,
+                color: madsSoftWhite,
               ),
             ),
 
@@ -376,7 +400,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
             const Text(
               'Start building a better relationship with money.',
-              style: TextStyle(color: Colors.black54),
+              style: TextStyle(color: madsMutedText),
             ),
 
             const SizedBox(height: 30),
@@ -414,14 +438,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
               child: ElevatedButton(
                 onPressed: isLoading ? null : signUp,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: forestGreen,
-                  foregroundColor: Colors.white,
+                  backgroundColor: madsBlue,
+                  foregroundColor: madsBackground,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(15),
                   ),
                 ),
                 child: isLoading
-                    ? const CircularProgressIndicator(color: Colors.white)
+                    ? const CircularProgressIndicator(color: madsBackground)
                     : const Text('Create account'),
               ),
             ),
@@ -438,7 +462,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 },
                 child: const Text(
                   'Already have an account? Log in',
-                  style: TextStyle(color: forestGreen),
+                  style: TextStyle(color: madsBlue),
                 ),
               ),
             ),
@@ -465,7 +489,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
             label,
             style: const TextStyle(
               fontWeight: FontWeight.w600,
-              color: forestGreen,
+              color: madsSoftWhite,
             ),
           ),
           const SizedBox(height: 9),
@@ -580,7 +604,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(backgroundColor: cream, foregroundColor: forestGreen),
+      appBar: AppBar(),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(25),
@@ -595,7 +619,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 fontSize: 34,
                 height: 1.2,
                 fontWeight: FontWeight.bold,
-                color: forestGreen,
+                color: madsSoftWhite,
               ),
             ),
 
@@ -603,14 +627,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
             const Text(
               'Your money, with a plan.',
-              style: TextStyle(color: Colors.black54),
+              style: TextStyle(color: madsMutedText),
             ),
 
             const SizedBox(height: 35),
 
             const Text(
               'Email address',
-              style: TextStyle(fontWeight: FontWeight.w600, color: forestGreen),
+              style: TextStyle(fontWeight: FontWeight.w600, color: madsSoftWhite),
             ),
 
             const SizedBox(height: 9),
@@ -633,7 +657,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
             const Text(
               'Password',
-              style: TextStyle(fontWeight: FontWeight.w600, color: forestGreen),
+              style: TextStyle(fontWeight: FontWeight.w600, color: madsSoftWhite),
             ),
 
             const SizedBox(height: 9),
@@ -668,7 +692,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 onPressed: resetPassword,
                 child: const Text(
                   'Forgot password?',
-                  style: TextStyle(color: forestGreen),
+                  style: TextStyle(color: madsBlue),
                 ),
               ),
             ),
@@ -680,14 +704,14 @@ class _LoginScreenState extends State<LoginScreen> {
               child: ElevatedButton(
                 onPressed: isLoading ? null : login,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: forestGreen,
-                  foregroundColor: Colors.white,
+                  backgroundColor: madsBlue,
+                  foregroundColor: madsBackground,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(15),
                   ),
                 ),
                 child: isLoading
-                    ? const CircularProgressIndicator(color: Colors.white)
+                    ? const CircularProgressIndicator(color: madsBackground)
                     : const Text('Log in'),
               ),
             ),
@@ -704,7 +728,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 },
                 child: const Text(
                   'New to MADS? Create an account',
-                  style: TextStyle(color: forestGreen),
+                  style: TextStyle(color: madsBlue),
                 ),
               ),
             ),

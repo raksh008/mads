@@ -216,13 +216,13 @@ class _AssistantBubble extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: isAssistant ? colors.surface : forestGreen,
+          color: isAssistant ? colors.surface : madsBlue,
           borderRadius: BorderRadius.circular(19),
         ),
         child: Text(
           message,
           style: TextStyle(
-            color: isAssistant ? colors.onSurface : Colors.white,
+            color: isAssistant ? colors.onSurface : madsBackground,
             height: 1.4,
           ),
         ),
