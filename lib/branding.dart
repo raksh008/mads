@@ -5,6 +5,13 @@ const Color cream = Color(0xFFF7F6EF);
 const Color ink = Color(0xFF172B3A);
 const Color coral = Color(0xFFD85E58);
 
+// Colours sampled from assets/mads-logo.png.
+const String madsLogoAsset = 'assets/mads-logo.png';
+const Color madsLogoEdge = Color(0xFF000000); // logo background at its edges
+const Color madsNavy = Color(0xFF021423); // logo background at its centre
+const Color madsSoftWhite = Color(0xFFF7F7F8); // "mads" lettering
+const Color madsBlue = Color(0xFF2FAAFF); // the stroke on the "d"
+
 final ValueNotifier<ThemeMode> madsThemeMode = ValueNotifier(ThemeMode.system);
 
 class MadsLogo extends StatelessWidget {

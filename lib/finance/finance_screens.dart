@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../branding.dart';
+import '../splash_screen.dart';
 import 'bank_messages_screen.dart';
 import 'board_plan_choices.dart';
 import 'finance_assistant.dart';
@@ -26,9 +27,19 @@ class FinancialProfileGate extends StatefulWidget {
   State<FinancialProfileGate> createState() => _FinancialProfileGateState();
 }
 
-class _FinancialProfileGateState extends State<FinancialProfileGate> {
+class _FinancialProfileGateState extends State<FinancialProfileGate>
+    with SingleTickerProviderStateMixin {
   late final FinanceRepository repository;
   late Future<FinanceState> stateFuture;
+
+  // Splash: logo first, greeting from 40% of the way, home once it completes
+  // and the finance data has loaded. An animation (not a Timer) so widget
+  // tests can run through it with pumpAndSettle.
+  late final AnimationController _splash = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2400),
+  );
+  bool _showGreeting = false;
 
   @override
   void initState() {
@@ -37,6 +48,22 @@ class _FinancialProfileGateState extends State<FinancialProfileGate> {
         widget.repositoryFactory?.call(widget.user.id) ??
         FinanceRepository(widget.user.id, Supabase.instance.client);
     stateFuture = _loadState();
+    _splash
+      ..addListener(() {
+        if (!_showGreeting && _splash.value >= 0.4) {
+          setState(() => _showGreeting = true);
+        }
+      })
+      ..addStatusListener((status) {
+        if (status == AnimationStatus.completed) setState(() {});
+      })
+      ..forward();
+  }
+
+  @override
+  void dispose() {
+    _splash.dispose();
+    super.dispose();
   }
 
   Future<FinanceState> _loadState() async {
@@ -56,9 +83,13 @@ class _FinancialProfileGateState extends State<FinancialProfileGate> {
   Widget build(BuildContext context) => FutureBuilder<FinanceState>(
     future: stateFuture,
     builder: (context, snapshot) {
-      if (snapshot.connectionState == ConnectionState.waiting) {
-        return const Scaffold(
-          body: Center(child: CircularProgressIndicator(color: forestGreen)),
+      if (snapshot.connectionState == ConnectionState.waiting ||
+          !_splash.isCompleted) {
+        return MadsSplash(
+          firstName: madsFirstName(
+            widget.user.userMetadata?['full_name'] as String?,
+          ),
+          showGreeting: _showGreeting,
         );
       }
       if (snapshot.hasError || !snapshot.hasData) {

@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'branding.dart';
 import 'finance/finance_screens.dart';
+import 'splash_screen.dart';
 
 // ==========================================
 // 1. SUPABASE INITIALIZATION
@@ -103,11 +104,23 @@ class _AuthGateState extends State<AuthGate> {
   late User? currentUser;
   StreamSubscription<AuthState>? authSubscription;
 
+  // When the app opens logged out, show the logo briefly before Welcome.
+  // (Logged-in users get the logo + greeting splash in FinancialProfileGate.)
+  bool showLogoIntro = false;
+  Timer? logoIntroTimer;
+
   @override
   void initState() {
     super.initState();
 
     currentUser = supabase.auth.currentUser;
+
+    if (currentUser == null) {
+      showLogoIntro = true;
+      logoIntroTimer = Timer(const Duration(milliseconds: 1200), () {
+        if (mounted) setState(() => showLogoIntro = false);
+      });
+    }
 
     authSubscription = supabase.auth.onAuthStateChange.listen((authState) {
       if (!mounted) return;
@@ -121,12 +134,14 @@ class _AuthGateState extends State<AuthGate> {
   @override
   void dispose() {
     authSubscription?.cancel();
+    logoIntroTimer?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     if (currentUser == null) {
+      if (showLogoIntro) return const MadsSplash();
       return const WelcomeScreen();
     }
 
