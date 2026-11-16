@@ -141,7 +141,7 @@ class _AuthGateState extends State<AuthGate> {
 
     if (currentUser == null) {
       showLogoIntro = true;
-      logoIntroTimer = Timer(const Duration(milliseconds: 1200), () {
+      logoIntroTimer = Timer(const Duration(milliseconds: 1000), () {
         if (mounted) setState(() => showLogoIntro = false);
       });
     }

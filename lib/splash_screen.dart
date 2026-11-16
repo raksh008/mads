@@ -9,12 +9,14 @@ String? madsFirstName(String? fullName) {
   return trimmed.split(RegExp(r'\s+')).first;
 }
 
-/// The MADS logo on its own dark background, optionally followed by a
-/// greeting. The logo image fades from navy to pure black at its edges,
+/// The MADS logo with the tagline "Your finance pal", on the logo's own dark
+/// background. The logo image fades from navy to pure black at its edges,
 /// so it sits on a black screen with no visible border.
 class MadsSplash extends StatelessWidget {
-  /// The user's first name. Null shows the logo only.
+  /// Not shown. Kept so existing callers still compile.
   final String? firstName;
+
+  /// Not used. Kept so existing callers still compile.
   final bool showGreeting;
 
   const MadsSplash({super.key, this.firstName, this.showGreeting = false});
@@ -33,36 +35,16 @@ class MadsSplash extends StatelessWidget {
             fit: BoxFit.contain,
             semanticLabel: 'MADS',
           ),
-          Align(
-            alignment: const Alignment(0, 0.38),
-            child: AnimatedSlide(
-              offset: showGreeting ? Offset.zero : const Offset(0, 0.4),
-              duration: const Duration(milliseconds: 450),
-              curve: Curves.easeOutCubic,
-              child: AnimatedOpacity(
-                opacity: showGreeting ? 1 : 0,
-                duration: const Duration(milliseconds: 450),
-                child: Text.rich(
-                  TextSpan(
-                    text: 'Hi',
-                    children: [
-                      if (firstName != null) ...[
-                        const TextSpan(text: ', '),
-                        TextSpan(
-                          text: firstName,
-                          style: const TextStyle(color: madsBlue),
-                        ),
-                      ],
-                    ],
-                  ),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: madsSoftWhite,
-                    fontSize: 28,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.2,
-                  ),
-                ),
+          // Sits just below the "mads" wordmark in the middle of the image.
+          Padding(
+            padding: EdgeInsets.only(top: width * 0.42),
+            child: const Text(
+              'Your finance pal',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: madsMutedText,
+                fontSize: 16,
+                letterSpacing: 0.6,
               ),
             ),
           ),

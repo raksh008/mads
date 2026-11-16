@@ -32,14 +32,13 @@ class _FinancialProfileGateState extends State<FinancialProfileGate>
   late final FinanceRepository repository;
   late Future<FinanceState> stateFuture;
 
-  // Splash: logo first, greeting from 40% of the way, home once it completes
-  // and the finance data has loaded. An animation (not a Timer) so widget
-  // tests can run through it with pumpAndSettle.
+  // Splash: logo for about one second, then home once the finance data has
+  // loaded. An animation (not a Timer) so widget tests can run through it
+  // with pumpAndSettle.
   late final AnimationController _splash = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 2400),
+    duration: const Duration(milliseconds: 1000),
   );
-  bool _showGreeting = false;
 
   @override
   void initState() {
@@ -49,11 +48,6 @@ class _FinancialProfileGateState extends State<FinancialProfileGate>
         FinanceRepository(widget.user.id, Supabase.instance.client);
     stateFuture = _loadState();
     _splash
-      ..addListener(() {
-        if (!_showGreeting && _splash.value >= 0.4) {
-          setState(() => _showGreeting = true);
-        }
-      })
       ..addStatusListener((status) {
         if (status == AnimationStatus.completed) setState(() {});
       })
@@ -85,12 +79,7 @@ class _FinancialProfileGateState extends State<FinancialProfileGate>
     builder: (context, snapshot) {
       if (snapshot.connectionState == ConnectionState.waiting ||
           !_splash.isCompleted) {
-        return MadsSplash(
-          firstName: madsFirstName(
-            widget.user.userMetadata?['full_name'] as String?,
-          ),
-          showGreeting: _showGreeting,
-        );
+        return const MadsSplash();
       }
       if (snapshot.hasError || !snapshot.hasData) {
         return Scaffold(
