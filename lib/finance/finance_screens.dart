@@ -577,6 +577,10 @@ class _HomeScreenState extends State<HomeScreen> {
   late FinanceState state;
   BoardPlanChoices? planChoices;
 
+  /// Whether the Safe to Spend card's "See how this is worked out" section
+  /// is open. Collapsed by default.
+  bool _showSafeWorking = false;
+
   @override
   void initState() {
     super.initState();
@@ -851,61 +855,22 @@ class _HomeScreenState extends State<HomeScreen> {
       (sum, board) => sum + state.spentFor(board.id, period: period),
     );
     final hasData = state.boards.isNotEmpty && totalSpent > 0;
-    final scheme = Theme.of(context).colorScheme;
-    return Material(
-      color: scheme.surface,
-      borderRadius: BorderRadius.circular(21),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(21),
-        onTap: () => Navigator.push<void>(
-          context,
-          MaterialPageRoute(
-            builder: (_) =>
-                SpendingBreakdownScreen(state: state, month: DateTime.now()),
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Row(
-            children: [
-              Icon(Icons.grid_view_rounded, color: scheme.primary),
-              const SizedBox(width: 13),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'SPENT THIS MONTH · ${_monthLabel(DateTime.now())}',
-                      style: TextStyle(
-                        color: scheme.onSurfaceVariant,
-                        fontSize: 11,
-                        letterSpacing: 1.1,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    hasData
-                        ? Text(
-                            '${Money.format(totalSpent, currency: currency)} across ${state.boards.length} boards',
-                            style: TextStyle(
-                              color: scheme.onSurface,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          )
-                        : Text(
-                            'Not enough data yet. Add your income and expenses to see your financial insights.',
-                            style: TextStyle(
-                              color: scheme.onSurfaceVariant,
-                              height: 1.4,
-                            ),
-                          ),
-                  ],
-                ),
-              ),
-              Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
-            ],
-          ),
+    return _compactHomeTile(
+      icon: Icons.grid_view_rounded,
+      label: 'SPENT THIS MONTH',
+      value: hasData
+          ? Money.format(totalSpent, currency: currency)
+          : 'Nothing yet',
+      valueIsPlaceholder: !hasData,
+      footer: hasData
+          ? 'across ${state.boards.length} boards'
+          : 'Add expenses to see it',
+      footerIsAction: false,
+      onTap: () => Navigator.push<void>(
+        context,
+        MaterialPageRoute(
+          builder: (_) =>
+              SpendingBreakdownScreen(state: state, month: DateTime.now()),
         ),
       ),
     );
@@ -934,15 +899,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'MADS.',
-                            style: Theme.of(context).textTheme.titleLarge
-                                ?.copyWith(
-                                  color: Theme.of(context).colorScheme.primary,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 1.1,
-                                ),
-                          ),
+                          const MadsLogo(fontSize: 20),
+                          const SizedBox(height: 6),
                           Text(
                             'Your finance pal.',
                             style: TextStyle(
@@ -973,13 +931,20 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                _incomeCard(profile, currency),
+                _safeToSpendCard(profile, currency),
+                const SizedBox(height: 12),
+                IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(child: _incomeCard(profile, currency)),
+                      const SizedBox(width: 12),
+                      Expanded(child: _spendingSummaryCard(period, currency)),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 16),
                 _madsCard(profile, period, currency),
-                const SizedBox(height: 16),
-                _spendingSummaryCard(period, currency),
-                const SizedBox(height: 16),
-                _safeToSpendCard(profile, currency),
                 const SizedBox(height: 14),
                 _recentTransactions(currency),
                 const SizedBox(height: 12),
@@ -1002,65 +967,88 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _incomeCard(FinancialProfile? profile, String currency) => Container(
-    padding: const EdgeInsets.all(19),
-    decoration: BoxDecoration(
-      color: Theme.of(context).colorScheme.surface,
-      borderRadius: BorderRadius.circular(22),
-    ),
-    child: Row(
-      children: [
-        Container(
-          width: 47,
-          height: 47,
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primary
-                .withValues(alpha: 0.09),
-            borderRadius: BorderRadius.circular(15),
-          ),
-          child: Icon(
-            Icons.account_balance_wallet_outlined,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-        ),
-        const SizedBox(width: 13),
-        Expanded(
+  /// A compact half-width tile on the Home screen, shared by the Monthly
+  /// Income and Spent cards. The whole tile is the tap target.
+  Widget _compactHomeTile({
+    required IconData icon,
+    required String label,
+    required String value,
+    required bool valueIsPlaceholder,
+    required String footer,
+    required bool footerIsAction,
+    required VoidCallback onTap,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: scheme.surface,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'MONTHLY INCOME',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  fontSize: 11,
-                  letterSpacing: 1.1,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 5),
-              Text(
-                profile == null
-                    ? 'Add your income'
-                    : Money.format(
-                        profile.monthlyIncomeMinor,
-                        currency: currency,
+              Row(
+                children: [
+                  Icon(icon, color: scheme.primary, size: 18),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        color: scheme.onSurfaceVariant,
+                        fontSize: 10.5,
+                        letterSpacing: 1,
+                        fontWeight: FontWeight.w600,
                       ),
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface,
-                  fontSize: 23,
-                  fontWeight: FontWeight.w800,
-                ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                value,
+                style: valueIsPlaceholder
+                    ? TextStyle(color: scheme.onSurfaceVariant, fontSize: 14)
+                    : TextStyle(
+                        color: scheme.onSurface,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                      ),
+              ),
+              const Spacer(),
+              const SizedBox(height: 4),
+              Text(
+                footer,
+                style: footerIsAction
+                    ? TextStyle(
+                        color: scheme.primary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      )
+                    : TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
               ),
             ],
           ),
         ),
-        TextButton(
-          onPressed: _editFinancialProfile,
-          child: Text(profile == null ? 'Set up' : 'Edit'),
-        ),
-      ],
-    ),
-  );
+      ),
+    );
+  }
+
+  Widget _incomeCard(FinancialProfile? profile, String currency) =>
+      _compactHomeTile(
+        icon: Icons.account_balance_wallet_outlined,
+        label: 'MONTHLY INCOME',
+        value: profile == null
+            ? 'Add your income'
+            : Money.format(profile.monthlyIncomeMinor, currency: currency),
+        valueIsPlaceholder: profile == null,
+        footer: profile == null ? 'Set up' : 'Edit',
+        footerIsAction: true,
+        onTap: _editFinancialProfile,
+      );
 
   Widget _madsCard(FinancialProfile? profile, String period, String currency) {
     final scheme = Theme.of(context).colorScheme;
@@ -1126,7 +1114,6 @@ class _HomeScreenState extends State<HomeScreen> {
       DateTime.now(),
       excludedBoardIds: _excludedBoards,
     );
-    final balance = safe.balanceNowMinor;
     final free = safe.freeToSpendMinor;
     final String headline;
     final String explanation;
@@ -1180,19 +1167,83 @@ class _HomeScreenState extends State<HomeScreen> {
             explanation,
             style: const TextStyle(color: Colors.white70, height: 1.45),
           ),
-          if (free != null && balance != null) ...[
-            const SizedBox(height: 12),
-            const Divider(color: Colors.white24, height: 1),
-            const SizedBox(height: 4),
-            _equationRow('Balance now', balance, currency),
-            _equationRow('Savings kept aside', safe.savingsKeptMinor!, currency),
-            _equationRow('Kept for boards', safe.keptForBoardsMinor!, currency),
-            _equationRow('Free to spend', free, currency),
-            _infoRow('Days left, including today', '${safe.daysLeft}'),
-          ],
+          // The working is collapsed until tapped; the figures are unchanged.
           if (profile != null) ...[
-            const SizedBox(height: 10),
-            Row(
+            const SizedBox(height: 8),
+            Semantics(
+              // Its own node, so screen readers don't merge the whole card
+              // into this button.
+              container: true,
+              button: true,
+              expanded: _showSafeWorking,
+              child: InkWell(
+                onTap: () =>
+                    setState(() => _showSafeWorking = !_showSafeWorking),
+                borderRadius: BorderRadius.circular(10),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'See how this is worked out',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      AnimatedRotation(
+                        turns: _showSafeWorking ? 0.5 : 0,
+                        duration: const Duration(milliseconds: 200),
+                        child: const Icon(
+                          Icons.expand_more,
+                          color: Colors.white70,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            AnimatedSize(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOut,
+              alignment: Alignment.topCenter,
+              child: _showSafeWorking
+                  ? _safeWorking(profile, safe, currency)
+                  : const SizedBox(width: double.infinity),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// The rows behind Safe to Spend, shown when "See how this is worked out"
+  /// is expanded.
+  Widget _safeWorking(
+    FinancialProfile profile,
+    SafeToSpend safe,
+    String currency,
+  ) {
+    final balance = safe.balanceNowMinor;
+    final free = safe.freeToSpendMinor;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Divider(color: Colors.white24, height: 1),
+        const SizedBox(height: 4),
+        if (free != null && balance != null) ...[
+          _equationRow('Balance now', balance, currency),
+          _equationRow('Savings kept aside', safe.savingsKeptMinor!, currency),
+          _equationRow('Kept for boards', safe.keptForBoardsMinor!, currency),
+          _equationRow('Free to spend', free, currency),
+          _infoRow('Days left, including today', '${safe.daysLeft}'),
+        ],
+        const SizedBox(height: 10),
+        Row(
               children: [
                 Expanded(
                   child: Text(
@@ -1213,18 +1264,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ],
             ),
-            if (DateTime.now().difference(profile.balanceAsOf) >
-                const Duration(days: 7))
-              const Text(
-                'Check your bank balance and update it.',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-          ],
-        ],
-      ),
+        if (DateTime.now().difference(profile.balanceAsOf) >
+            const Duration(days: 7))
+          const Text(
+            'Check your bank balance and update it.',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          ),
+      ],
     );
   }
 

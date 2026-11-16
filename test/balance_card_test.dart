@@ -77,8 +77,14 @@ Future<void> _pumpHome(WidgetTester tester, FinanceState state) async {
     ),
   );
   await tester.pumpAndSettle();
+  // The working is collapsed by default: only the number and explanation
+  // show until "See how this is worked out" is tapped.
+  expect(find.text('Balance now'), findsNothing);
+  expect(find.text('Update from bank'), findsNothing);
+  await tester.tap(find.text('See how this is worked out'));
+  await tester.pumpAndSettle();
   await tester.scrollUntilVisible(
-    find.text('Update from bank'),
+    find.text('Update from bank').hitTestable(),
     300,
     scrollable: find.byType(Scrollable).first,
   );

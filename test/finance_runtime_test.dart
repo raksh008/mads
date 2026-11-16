@@ -466,7 +466,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Home'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('₹15,000 across'), findsOneWidget);
+    // The Spent tile shows the total on its own line.
+    expect(find.text('₹15,000'), findsOneWidget);
   });
 
   testWidgets('bottom navigation switches between home tabs', (tester) async {
@@ -520,7 +521,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('MADS.'), findsOneWidget);
+    expect(find.byType(MadsLogo), findsOneWidget);
     expect(find.text('Your finance pal.'), findsOneWidget);
     expect(find.text('Hi, Test!'), findsOneWidget);
     expect(find.text('Your money, organised for the month.'), findsOneWidget);
