@@ -677,7 +677,7 @@ void main() {
       await tester.tap(find.text('Save transaction'));
       await tester.pumpAndSettle();
       // Onboarding entered only income, so the balance is ₹0 and nothing is
-      // left this month: the expense asks before spending from savings.
+      // above savings: the expense asks before spending from savings.
       expect(
         find.text('This goes into your savings. Spend from savings?'),
         findsOneWidget,

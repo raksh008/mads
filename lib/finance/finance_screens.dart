@@ -1672,7 +1672,7 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
       builder: (_) => AddTransactionDialog(
         initialDescription: description,
         boardName: widget.board.name,
-        leftThisMonthMinor:
+        aboveSavingsMinor:
             computeSafeToSpend(state, DateTime.now()).aboveSavingsMinor,
       ),
     );
@@ -1953,10 +1953,6 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
   @override
   Widget build(BuildContext context) {
     final month = _monthLabel(DateTime.now());
-    final allocationTotal = state.allocations
-        .where((item) => item.periodStart == period)
-        .fold(0, (sum, item) => sum + item.amountMinor);
-    final pool = state.profile?.monthlyBudgetPoolMinor;
     final remainder = budget - spent;
     final progress = budget <= 0
         ? 0.0
@@ -2002,7 +1998,7 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
             ],
             if (_inPlan != false) ...[
               const SizedBox(height: 18),
-              _budgetEditor(allocationTotal, pool),
+              _budgetEditor(),
             ],
             const SizedBox(height: 24),
             Row(
@@ -2146,7 +2142,7 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
     ),
   );
 
-  Widget _budgetEditor(int allocationTotal, int? pool) => Form(
+  Widget _budgetEditor() => Form(
     key: budgetFormKey,
     child: Container(
       padding: const EdgeInsets.all(18),
@@ -2187,10 +2183,10 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
                 ? 'Enter a valid amount.'
                 : null,
           ),
-          if (_wouldOverallocate(allocationTotal, pool)) ...[
+          if (_shortfallWithDraft() case final shortfall?) ...[
             const SizedBox(height: 9),
             Text(
-              'With this amount, all boards will have ${Money.format(_proposedTotal(allocationTotal), currency: currency)} planned against a ${Money.format(pool!, currency: currency)} pool. You can still save it; review the total plan on your home screen.',
+              'With this amount, your plan would need ${Money.format(shortfall, currency: currency)} more than your free money this month (${Money.format(_freeToSpend(state) ?? 0, currency: currency)} free now). You can still save it.',
               style: const TextStyle(
                 color: madsDanger,
                 height: 1.35,
@@ -2381,13 +2377,40 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
     );
   }
 
-  int _proposedTotal(int currentTotal) {
-    final draft = Money.parseMinor(budgetController.text.trim());
-    return draft == null ? currentTotal : currentTotal - budget + draft;
-  }
+  /// Free to spend this month for [s], worked out exactly like the home
+  /// screen's Safe to Spend card (boards answered "not in plan" excluded).
+  int? _freeToSpend(FinanceState s) => computeSafeToSpend(
+    s,
+    DateTime.now(),
+    excludedBoardIds:
+        widget.planChoices?.excludedBoards(
+          s.boards.map((board) => board.id),
+          period,
+        ) ??
+        const {},
+  ).freeMinor;
 
-  bool _wouldOverallocate(int currentTotal, int? pool) =>
-      pool != null && _proposedTotal(currentTotal) > pool;
+  /// How far below zero free-to-spend would go if this board's budget were
+  /// the amount typed in, or null if it stays at or above zero (or the amount
+  /// or money profile is missing).
+  int? _shortfallWithDraft() {
+    final draft = Money.parseMinor(budgetController.text.trim());
+    if (draft == null) return null;
+    final withDraft = state.copyWith(
+      allocations: [
+        for (final item in state.allocations)
+          if (!(item.boardId == widget.board.id && item.periodStart == period))
+            item,
+        BudgetAllocation(
+          boardId: widget.board.id,
+          periodStart: period,
+          amountMinor: draft,
+        ),
+      ],
+    );
+    final freeAfter = _freeToSpend(withDraft);
+    return freeAfter == null || freeAfter >= 0 ? null : -freeAfter;
+  }
 }
 
 /// Asks for one amount paid. Used by the rent board and by "already paid?"
@@ -2471,13 +2494,13 @@ class AddTransactionDialog extends StatefulWidget {
   /// Money in the account above the savings target (from the Safe to Spend
   /// maths). When an expense would take it below zero, the user is asked to
   /// confirm spending from savings. Null skips the check.
-  final int? leftThisMonthMinor;
+  final int? aboveSavingsMinor;
 
   const AddTransactionDialog({
     super.key,
     this.initialDescription,
     required this.boardName,
-    this.leftThisMonthMinor,
+    this.aboveSavingsMinor,
   });
 
   @override
@@ -2508,8 +2531,10 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
   Future<void> save() async {
     if (!formKey.currentState!.validate()) return;
     final amount = Money.parseMinor(amountController.text.trim())!;
-    final left = widget.leftThisMonthMinor;
-    if (kind == TransactionKind.expense && left != null && left - amount < 0) {
+    final aboveSavings = widget.aboveSavingsMinor;
+    if (kind == TransactionKind.expense &&
+        aboveSavings != null &&
+        aboveSavings - amount < 0) {
       final spendFromSavings = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(

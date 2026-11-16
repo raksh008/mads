@@ -40,7 +40,7 @@ void main() {
                 context: context,
                 builder: (_) => AddTransactionDialog(
                   boardName: 'Shopping',
-                  leftThisMonthMinor: left,
+                  aboveSavingsMinor: left,
                 ),
               );
               closed = true;
