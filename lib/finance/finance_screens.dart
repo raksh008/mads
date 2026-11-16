@@ -2,9 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../branding.dart';
+import 'bank_messages_screen.dart';
+import 'board_plan_choices.dart';
 import 'finance_assistant.dart';
 import 'finance_assistant_screen.dart';
+import 'finance_engine.dart';
 import 'household_screen.dart';
+import 'spending_breakdown_screen.dart';
 import 'finance_models.dart';
 import 'finance_repository.dart';
 
@@ -88,7 +92,14 @@ class _FinancialProfileGateState extends State<FinancialProfileGate> {
 class OnboardingScreen extends StatefulWidget {
   final FinancialProfile? initialProfile;
 
-  const OnboardingScreen({super.key, this.initialProfile});
+  /// Opens with the balance field focused and selected, for "Update from bank".
+  final bool focusBalance;
+
+  const OnboardingScreen({
+    super.key,
+    this.initialProfile,
+    this.focusBalance = false,
+  });
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -100,6 +111,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   late final TextEditingController balanceController;
   late final TextEditingController savingsController;
   late DateTime balanceAsOf;
+  bool checkDatePicked = false;
   bool saving = false;
 
   @override
@@ -116,6 +128,27 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       text: _minorInput(profile?.plannedSavingsMinor ?? 0),
     );
     balanceAsOf = profile?.balanceAsOf ?? DateTime.now();
+    if (widget.focusBalance) {
+      balanceController.selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: balanceController.text.length,
+      );
+    }
+  }
+
+  /// When the balance was checked. A newly entered balance is checked now;
+  /// a picked earlier day means the end of that day; otherwise unchanged.
+  DateTime _checkedAt(int balanceMinor) {
+    final now = DateTime.now();
+    if (checkDatePicked) {
+      final day = balanceAsOf;
+      final isToday =
+          day.year == now.year && day.month == now.month && day.day == now.day;
+      return isToday ? now : DateTime(day.year, day.month, day.day, 23, 59, 59);
+    }
+    final initial = widget.initialProfile;
+    if (initial == null || balanceMinor != initial.balanceMinor) return now;
+    return initial.balanceAsOf;
   }
 
   @override
@@ -144,7 +177,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         unpaidCommitmentsMinor:
             widget.initialProfile?.unpaidCommitmentsMinor ?? 0,
         plannedSavingsMinor: values[2],
-        balanceAsOf: balanceAsOf,
+        balanceAsOf: _checkedAt(values[1]),
       ),
     );
   }
@@ -153,11 +186,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     String label,
     TextEditingController controller, {
     bool required = false,
+    bool autofocus = false,
     String? helper,
   }) => Padding(
     padding: const EdgeInsets.only(bottom: 16),
     child: TextFormField(
       controller: controller,
+      autofocus: autofocus,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       decoration: InputDecoration(
         labelText: label,
@@ -237,6 +272,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             _moneyField(
               'Current account balance',
               balanceController,
+              autofocus: widget.focusBalance,
               helper: "Your current balance is the money available in the account or accounts you've chosen to include, as of the date shown. It already reflects transactions completed before that time.",
             ),
             _dateButton(),
@@ -270,7 +306,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           firstDate: DateTime(2000),
           lastDate: DateTime.now(),
         );
-        if (picked != null) setState(() => balanceAsOf = picked);
+        if (picked != null) {
+          setState(() {
+            balanceAsOf = picked;
+            checkDatePicked = true;
+          });
+        }
       },
       icon: const Icon(Icons.event_outlined),
       label: Text('Balance last checked · ${_dateLabel(balanceAsOf)}'),
@@ -300,13 +341,25 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late FinanceState state;
+  BoardPlanChoices? planChoices;
 
   @override
   void initState() {
     super.initState();
     state = widget.initialState;
     _refreshCatalogIcons();
+    BoardPlanChoices.load().then((choices) {
+      if (mounted) setState(() => planChoices = choices);
+    });
   }
+
+  /// Boards answered No for this month: nothing is kept aside for them.
+  Set<String> get _excludedBoards =>
+      planChoices?.excludedBoards(
+        state.boards.map((board) => board.id),
+        periodOf(DateTime.now()),
+      ) ??
+      const {};
 
   Future<void> _save(FinanceState value) async {
     setState(() => state = value);
@@ -338,11 +391,14 @@ class _HomeScreenState extends State<HomeScreen> {
     if (changed && mounted) await _save(state.copyWith(boards: boards));
   }
 
-  Future<void> _editFinancialProfile() async {
+  Future<void> _editFinancialProfile({bool focusBalance = false}) async {
     final profile = await Navigator.push<FinancialProfile>(
       context,
       MaterialPageRoute(
-        builder: (_) => OnboardingScreen(initialProfile: state.profile),
+        builder: (_) => OnboardingScreen(
+          initialProfile: state.profile,
+          focusBalance: focusBalance,
+        ),
       ),
     );
     if (profile != null && mounted) {
@@ -351,11 +407,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _addBoard() async {
-    final name = await Navigator.push<String>(
+    final details = await Navigator.push<NewBoardDetails>(
       context,
       MaterialPageRoute(builder: (_) => const AddExpenseBoardScreen()),
     );
-    if (name == null || !mounted) return;
+    if (details == null || !mounted) return;
+    final name = details.name;
     if (state.boards.any(
       (board) => normalizeName(board.name) == normalizeName(name),
     )) {
@@ -373,8 +430,59 @@ class _HomeScreenState extends State<HomeScreen> {
       logoUrl: icon.logoUrl,
       accentColor: icon.accentColor,
       sortOrder: state.boards.length,
+      type: details.type,
+      dueDay: details.dueDay,
     );
     await _save(state.copyWith(boards: [...state.boards, board]));
+  }
+
+  /// Adds transactions read from pasted bank messages. Each keeps its message
+  /// date, so ones dated before the last balance check don't change Balance
+  /// now. Debits are expenses; credits are income.
+  Future<void> _pasteBankMessages() async {
+    final entries = await Navigator.push<List<BankMessageEntry>>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BankMessagesScreen(
+          boards: state.boards,
+          existing: state.transactions,
+        ),
+      ),
+    );
+    if (entries == null || entries.isEmpty || !mounted) return;
+    final added = <FinanceTransaction>[];
+    for (final entry in entries) {
+      final merchant = await widget.repository.resolveCatalogItem(
+        entry.merchant,
+      );
+      added.add(
+        FinanceTransaction(
+          id: newId(),
+          boardId: entry.boardId,
+          description: entry.merchant,
+          amountMinor: entry.amountMinor,
+          occurredAt: entry.date,
+          kind: entry.isDebit ? TransactionKind.expense : TransactionKind.income,
+          merchantKey: merchant.merchantKey,
+          iconKey: merchant.iconKey,
+          logoUrl: merchant.logoUrl,
+          accentColor: merchant.accentColor,
+          source: 'bank_sms',
+          externalId: entry.duplicateKey,
+        ),
+      );
+    }
+    if (!mounted) return;
+    await _save(state.copyWith(transactions: [...added, ...state.transactions]));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Added ${added.length} transaction${added.length == 1 ? '' : 's'}.',
+          ),
+        ),
+      );
+    }
   }
 
   Future<void> _openBoard(ExpenseBoard board) async {
@@ -385,6 +493,7 @@ class _HomeScreenState extends State<HomeScreen> {
           board: board,
           repository: widget.repository,
           initialState: state,
+          planChoices: planChoices,
           onStateChanged: (next) {
             if (mounted) setState(() => state = next);
           },
@@ -484,6 +593,7 @@ class _HomeScreenState extends State<HomeScreen> {
         budgetMinor: state.allocationFor(board.id, period),
         spentMinor: state.spentFor(board.id, period: period),
         currency: currency,
+        inPlan: planChoices?.includedIn(board.id, period) != false,
         onTap: () => _openBoard(board),
       );
     },
@@ -513,7 +623,13 @@ class _HomeScreenState extends State<HomeScreen> {
       borderRadius: BorderRadius.circular(21),
       child: InkWell(
         borderRadius: BorderRadius.circular(21),
-        onTap: () => setState(() => _tab = 1),
+        onTap: () => Navigator.push<void>(
+          context,
+          MaterialPageRoute(
+            builder: (_) =>
+                SpendingBreakdownScreen(state: state, month: DateTime.now()),
+          ),
+        ),
         child: Padding(
           padding: const EdgeInsets.all(18),
           child: Row(
@@ -565,11 +681,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final profile = state.profile;
     final period = periodOf(DateTime.now());
     final currency = profile?.currency ?? 'INR';
-    final totalAllocated = state.allocations
-        .where((allocation) => allocation.periodStart == period)
-        .fold(0, (sum, allocation) => sum + allocation.amountMinor);
-    final planPool = profile?.monthlyBudgetPoolMinor;
-    final unallocated = planPool == null ? null : planPool - totalAllocated;
     final fullName = widget.userName?.trim();
     final firstName = fullName == null || fullName.isEmpty
         ? 'there'
@@ -636,20 +747,18 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 16),
                 _safeToSpendCard(profile, currency),
                 const SizedBox(height: 14),
-                if (unallocated != null)
-                  _allocationSummary(
-                    allocated: totalAllocated,
-                    pool: planPool!,
-                    remaining: unallocated,
-                    currency: currency,
-                  ),
-                const SizedBox(height: 14),
                 _recentTransactions(currency),
                 const SizedBox(height: 12),
                 OutlinedButton.icon(
                   onPressed: _spendCheck,
                   icon: const Icon(Icons.shopping_cart_outlined),
                   label: const Text('Check before you buy'),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: _pasteBankMessages,
+                  icon: const Icon(Icons.sms_outlined),
+                  label: const Text('Paste bank messages'),
                 ),
               ],
             ),
@@ -778,10 +887,29 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _safeToSpendCard(FinancialProfile? profile, String currency) {
-    final amount = state.safeToSpendMinor;
-    final dated = profile == null
-        ? ''
-        : 'Balance checked ${_dateLabel(profile.balanceAsOf)}';
+    final safe = computeSafeToSpend(
+      state,
+      DateTime.now(),
+      excludedBoardIds: _excludedBoards,
+    );
+    final balance = safe.balanceNowMinor;
+    final free = safe.freeToSpendMinor;
+    final String headline;
+    final String explanation;
+    if (free == null) {
+      headline = 'Set up your money profile';
+      explanation =
+          'Add your monthly income, current balance and savings target.';
+    } else if (free == 0) {
+      headline = Money.format(0, currency: currency);
+      explanation =
+          'Everything is planned for. Nothing extra to spend freely today.';
+    } else {
+      headline = Money.format(safe.safeTodayDisplayMinor!, currency: currency);
+      explanation =
+          'Money not kept aside for savings or your boards, spread evenly '
+          'over the days left, including today.';
+    }
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -796,7 +924,7 @@ class _HomeScreenState extends State<HomeScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'SAFE TO SPEND',
+            'SAFE TO SPEND TODAY',
             style: TextStyle(
               color: Colors.white70,
               fontSize: 11,
@@ -806,9 +934,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            amount == null
-                ? 'Set up your money profile'
-                : Money.format(amount, currency: currency),
+            headline,
             style: const TextStyle(
               color: Colors.white,
               fontSize: 29,
@@ -817,35 +943,49 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 6),
           Text(
-            amount == null
-                ? 'Add your monthly income, current balance and savings target.'
-                : 'Your balance snapshot, adjusted for posted transactions after it. Savings goals and the income-to-balance difference stay separate.',
+            explanation,
             style: const TextStyle(color: Colors.white70, height: 1.45),
           ),
-          if (amount != null) ...[
+          if (free != null && balance != null) ...[
             const SizedBox(height: 12),
-            Text(
-              dated,
-              style: const TextStyle(color: Colors.white60, fontSize: 12),
-            ),
-            const SizedBox(height: 10),
             const Divider(color: Colors.white24, height: 1),
-            const SizedBox(height: 9),
-            _equationRow('Current balance', profile!.balanceMinor, currency),
-            _equationRow(
-              'Transactions after balance check',
-              -state.transactionsSinceBalanceSnapshotMinor,
-              currency,
-            ),
-            if (amount < 0)
-              const Padding(
-                padding: EdgeInsets.only(top: 8),
-                child: Text(
-                  'Posted spending after the balance check exceeds that snapshot.',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
+            const SizedBox(height: 4),
+            _equationRow('Balance now', balance, currency),
+            _equationRow('Savings kept aside', safe.savingsKeptMinor!, currency),
+            _equationRow('Kept for boards', safe.keptForBoardsMinor!, currency),
+            _equationRow('Free to spend', free, currency),
+            _infoRow('Days left, including today', '${safe.daysLeft}'),
+          ],
+          if (profile != null) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Last checked '
+                    '${Money.format(profile.balanceMinor, currency: currency)}'
+                    ' · ${_shortDateLabel(profile.balanceAsOf)}',
+                    style: const TextStyle(color: Colors.white60, fontSize: 12),
                   ),
+                ),
+                TextButton.icon(
+                  onPressed: () => _editFinancialProfile(focusBalance: true),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  icon: const Icon(Icons.account_balance_outlined, size: 16),
+                  label: const Text('Update from bank'),
+                ),
+              ],
+            ),
+            if (DateTime.now().difference(profile.balanceAsOf) >
+                const Duration(days: 7))
+              const Text(
+                'Check your bank balance and update it.',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
           ],
@@ -853,6 +993,28 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+
+  Widget _infoRow(String label, String value) => Padding(
+    padding: const EdgeInsets.only(top: 5),
+    child: Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(color: Colors.white70, fontSize: 12),
+          ),
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    ),
+  );
 
   Widget _equationRow(String label, int value, String currency) => Padding(
     padding: const EdgeInsets.only(top: 5),
@@ -875,52 +1037,6 @@ class _HomeScreenState extends State<HomeScreen> {
       ],
     ),
   );
-
-  Widget _allocationSummary({
-    required int allocated,
-    required int pool,
-    required int remaining,
-    required String currency,
-  }) {
-    final over = remaining < 0;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: over ? const Color(0xFFFFF0ED) : const Color(0xFFEAF5EF),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            over ? Icons.warning_amber_rounded : Icons.pie_chart_outline,
-            color: over ? coral : forestGreen,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  over ? 'Your plan is over allocated' : 'Monthly plan',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: ink,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  over
-                      ? '${Money.format(allocated, currency: currency)} assigned · ${Money.format(remaining.abs(), currency: currency)} above your planned pool'
-                      : '${Money.format(allocated, currency: currency)} assigned · ${Money.format(remaining, currency: currency)} not assigned yet',
-                  style: const TextStyle(color: Colors.black54, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _recentTransactions(String currency) {
     final recent = [...state.transactions]
@@ -1076,6 +1192,9 @@ class _BoardTile extends StatelessWidget {
   final int budgetMinor;
   final int spentMinor;
   final String currency;
+
+  /// False when the board was answered No for this month's plan.
+  final bool inPlan;
   final VoidCallback onTap;
 
   const _BoardTile({
@@ -1083,12 +1202,15 @@ class _BoardTile extends StatelessWidget {
     required this.budgetMinor,
     required this.spentMinor,
     required this.currency,
+    this.inPlan = true,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final left = budgetMinor - spentMinor;
+    final (statusText, statusColor) = inPlan
+        ? _boardStatus(board, budgetMinor, spentMinor, currency)
+        : ('Not in plan', Colors.black45);
     return Material(
       color: Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(20),
@@ -1125,13 +1247,11 @@ class _BoardTile extends StatelessWidget {
                     style: const TextStyle(color: Colors.black54, fontSize: 12),
                   ),
                   Text(
-                    budgetMinor == 0
-                        ? 'Budget not set'
-                        : '${Money.format(left, currency: currency)} left',
+                    statusText,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: left < 0 ? coral : forestGreen,
+                      color: statusColor,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1152,12 +1272,16 @@ class ExpenseBoardScreen extends StatefulWidget {
   final FinanceState initialState;
   final ValueChanged<FinanceState> onStateChanged;
 
+  /// Saved Yes/No answers. Null hides the Yes/No question.
+  final BoardPlanChoices? planChoices;
+
   const ExpenseBoardScreen({
     super.key,
     required this.board,
     required this.repository,
     required this.initialState,
     required this.onStateChanged,
+    this.planChoices,
   });
 
   @override
@@ -1219,11 +1343,63 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
     );
     setState(() => savingBudget = true);
     await _persist(state.copyWith(allocations: allocations));
-    if (mounted) {
-      setState(() => savingBudget = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Monthly budget saved.')));
-    }
+    if (!mounted) return;
+    setState(() => savingBudget = false);
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('Monthly budget saved.')));
+    if (amount > 0) await _askIfAlreadyPaid(amount);
+  }
+
+  /// After a plan is set: if it's already paid, record what was paid as an
+  /// expense on this board. If not, nothing is saved and the plan shows as
+  /// still due.
+  Future<void> _askIfAlreadyPaid(int plannedMinor) async {
+    final alreadyPaid = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Already paid / spent this?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('No'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Yes'),
+          ),
+        ],
+      ),
+    );
+    if (alreadyPaid != true || !mounted) return;
+    final paid = await showDialog<int>(
+      context: context,
+      builder: (_) => _RentAmountDialog(
+        initialAmount: _minorInput(plannedMinor),
+        title: 'How much did you pay?',
+        label: 'Amount paid',
+        saveLabel: 'Save payment',
+      ),
+    );
+    if (paid == null || !mounted) return;
+    final merchant = await widget.repository.resolveCatalogItem(
+      widget.board.name,
+    );
+    final expense = FinanceTransaction(
+      id: newId(),
+      boardId: widget.board.id,
+      description: widget.board.name,
+      amountMinor: paid,
+      occurredAt: DateTime.now(),
+      merchantKey: merchant.merchantKey,
+      iconKey: merchant.iconKey,
+      logoUrl: merchant.logoUrl,
+      accentColor: merchant.accentColor,
+      // Already in the bank balance: counts on the board, not in Balance now.
+      source: alreadyPaidSource,
+    );
+    await _persist(
+      state.copyWith(transactions: [expense, ...state.transactions]),
+    );
   }
 
   Future<void> _addTransaction({String? description}) async {
@@ -1232,6 +1408,8 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
       builder: (_) => AddTransactionDialog(
         initialDescription: description,
         boardName: widget.board.name,
+        leftThisMonthMinor:
+            computeSafeToSpend(state, DateTime.now()).aboveSavingsMinor,
       ),
     );
     if (entry == null || !mounted) return;
@@ -1553,7 +1731,15 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
             const SizedBox(height: 20),
             _spendingSummary(progress, remainder),
             const SizedBox(height: 18),
-            _budgetEditor(allocationTotal, pool),
+            _typeSwitch(),
+            if (widget.planChoices != null) ...[
+              const SizedBox(height: 18),
+              _planQuestion(),
+            ],
+            if (_inPlan != false) ...[
+              const SizedBox(height: 18),
+              _budgetEditor(allocationTotal, pool),
+            ],
             const SizedBox(height: 24),
             Row(
               children: [
@@ -1659,7 +1845,9 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
         const SizedBox(height: 4),
         Text(
           budget == 0
-              ? 'Set a monthly budget to see what remains.'
+              ? (_board.type == BoardType.bill
+                    ? 'Set the bill amount to track if it is paid.'
+                    : 'Set a monthly budget to see what remains.')
               : 'of ${Money.format(budget, currency: currency)} planned',
           style: const TextStyle(color: Colors.black54),
         ),
@@ -1675,14 +1863,19 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            remainder >= 0
-                ? '${Money.format(remainder, currency: currency)} left in this board.'
-                : 'Over this board’s plan by ${Money.format(remainder.abs(), currency: currency)}.',
-            style: TextStyle(
-              color: remainder < 0 ? coral : forestGreen,
-              fontWeight: FontWeight.w600,
-            ),
+          Builder(
+            builder: (context) {
+              final (text, color) = _boardStatus(
+                _board,
+                budget,
+                spent,
+                currency,
+              );
+              return Text(
+                text,
+                style: TextStyle(color: color, fontWeight: FontWeight.w600),
+              );
+            },
           ),
         ],
       ],
@@ -1757,6 +1950,139 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
 
   String get month => _monthLabel(DateTime.now());
 
+  /// The latest saved version of this board (its type can change here).
+  ExpenseBoard get _board => state.boards.firstWhere(
+    (board) => board.id == widget.board.id,
+    orElse: () => widget.board,
+  );
+
+  Future<void> _changeType(BoardType type) async {
+    final board = _board;
+    if (type == board.type) return;
+    ExpenseBoard updated;
+    if (type == BoardType.bill) {
+      final day = await showDialog<int>(
+        context: context,
+        builder: (_) => const _DueDayDialog(),
+      );
+      if (day == null || !mounted) return;
+      updated = board.copyWith(type: BoardType.bill, dueDay: day);
+    } else {
+      updated = board.copyWith(type: BoardType.budget, clearDueDay: true);
+    }
+    await _persist(
+      state.copyWith(
+        boards: [
+          for (final item in state.boards)
+            item.id == updated.id ? updated : item,
+        ],
+      ),
+    );
+  }
+
+  Widget _typeSwitch() {
+    final board = _board;
+    final due = board.dueDateIn(DateTime.now());
+    return Row(
+      children: [
+        SegmentedButton<BoardType>(
+          segments: const [
+            ButtonSegment(value: BoardType.budget, label: Text('Budget')),
+            ButtonSegment(value: BoardType.bill, label: Text('Bill')),
+          ],
+          selected: {board.type},
+          onSelectionChanged: (value) => _changeType(value.first),
+        ),
+        const SizedBox(width: 12),
+        if (due != null)
+          Expanded(
+            child: Text(
+              'Due ${_shortDateLabel(due)} each month',
+              style: const TextStyle(color: Colors.black54),
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// This board's answer for this month: true Yes, false No, null unanswered.
+  bool? get _inPlan =>
+      widget.planChoices?.includedIn(widget.board.id, period);
+
+  Future<void> _answerPlan(bool include) async {
+    final choices = widget.planChoices!;
+    final boardId = widget.board.id;
+    if (!include && !choices.nudgeShown(boardId, period)) {
+      // One-time nudge per board per month before leaving it out.
+      await choices.markNudgeShown(boardId, period);
+      if (!mounted) return;
+      final stillNo = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Still a No?'),
+          content: Text(
+            'Nothing will be kept aside for ${widget.board.name} in this '
+            "month's plan.",
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Include it'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Still a No'),
+            ),
+          ],
+        ),
+      );
+      if (stillNo == null || !mounted) return;
+      include = !stillNo;
+    }
+    await choices.setIncluded(boardId, period, include);
+    if (mounted) setState(() {});
+  }
+
+  Widget _planQuestion() => Container(
+    padding: const EdgeInsets.all(18),
+    decoration: BoxDecoration(
+      color: const Color(0xFFEAF3EE),
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Include ${widget.board.name} in the $month plan?',
+          style: const TextStyle(
+            color: ink,
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 10),
+        SegmentedButton<bool>(
+          segments: const [
+            ButtonSegment(value: true, label: Text('Yes')),
+            ButtonSegment(value: false, label: Text('No')),
+          ],
+          selected: {?_inPlan},
+          emptySelectionAllowed: true,
+          onSelectionChanged: (value) {
+            if (value.isNotEmpty) _answerPlan(value.first);
+          },
+        ),
+        if (_inPlan == false) ...[
+          const SizedBox(height: 8),
+          const Text(
+            "Not in this month's plan. Spending here is still recorded.",
+            style: TextStyle(color: Colors.black54),
+          ),
+        ],
+      ],
+    ),
+  );
+
   Widget _transactionTile(FinanceTransaction transaction) {
     return Card(
       child: ListTile(
@@ -1800,10 +2126,19 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
       pool != null && _proposedTotal(currentTotal) > pool;
 }
 
-/// Rent board: asks only for the amount paid this month.
+/// Asks for one amount paid. Used by the rent board and by "already paid?"
+/// after a board's plan is set.
 class _RentAmountDialog extends StatefulWidget {
   final String initialAmount;
-  const _RentAmountDialog({required this.initialAmount});
+  final String title;
+  final String label;
+  final String saveLabel;
+  const _RentAmountDialog({
+    required this.initialAmount,
+    this.title = 'Add rent paid',
+    this.label = 'Rent amount',
+    this.saveLabel = 'Save rent',
+  });
 
   @override
   State<_RentAmountDialog> createState() => _RentAmountDialogState();
@@ -1828,15 +2163,15 @@ class _RentAmountDialogState extends State<_RentAmountDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-    title: const Text('Add rent paid'),
+    title: Text(widget.title),
     content: Form(
       key: formKey,
       child: TextFormField(
         controller: amountController,
         autofocus: true,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        decoration: const InputDecoration(
-          labelText: 'Rent amount',
+        decoration: InputDecoration(
+          labelText: widget.label,
           prefixText: '₹ ',
         ),
         validator: (value) {
@@ -1853,7 +2188,7 @@ class _RentAmountDialogState extends State<_RentAmountDialog> {
         onPressed: () => Navigator.pop(context),
         child: const Text('Cancel'),
       ),
-      FilledButton(onPressed: save, child: const Text('Save rent')),
+      FilledButton(onPressed: save, child: Text(widget.saveLabel)),
     ],
   );
 }
@@ -1868,10 +2203,17 @@ class _TransactionEntry {
 class AddTransactionDialog extends StatefulWidget {
   final String? initialDescription;
   final String boardName;
+
+  /// Money in the account above the savings target (from the Safe to Spend
+  /// maths). When an expense would take it below zero, the user is asked to
+  /// confirm spending from savings. Null skips the check.
+  final int? leftThisMonthMinor;
+
   const AddTransactionDialog({
     super.key,
     this.initialDescription,
     required this.boardName,
+    this.leftThisMonthMinor,
   });
 
   @override
@@ -1899,15 +2241,33 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
     super.dispose();
   }
 
-  void save() {
+  Future<void> save() async {
     if (!formKey.currentState!.validate()) return;
+    final amount = Money.parseMinor(amountController.text.trim())!;
+    final left = widget.leftThisMonthMinor;
+    if (kind == TransactionKind.expense && left != null && left - amount < 0) {
+      final spendFromSavings = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('This goes into your savings. Spend from savings?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Yes, spend it'),
+            ),
+          ],
+        ),
+      );
+      // Cancel leaves the entry unsaved, with the form still open to edit.
+      if (spendFromSavings != true || !mounted) return;
+    }
     Navigator.pop(
       context,
-      _TransactionEntry(
-        descriptionController.text.trim(),
-        Money.parseMinor(amountController.text.trim())!,
-        kind,
-      ),
+      _TransactionEntry(descriptionController.text.trim(), amount, kind),
     );
   }
 
@@ -1976,6 +2336,14 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
   );
 }
 
+/// What the Add board screen returns.
+class NewBoardDetails {
+  final String name;
+  final BoardType type;
+  final int? dueDay;
+  const NewBoardDetails(this.name, this.type, this.dueDay);
+}
+
 class AddExpenseBoardScreen extends StatefulWidget {
   const AddExpenseBoardScreen({super.key});
 
@@ -1986,16 +2354,26 @@ class AddExpenseBoardScreen extends StatefulWidget {
 class _AddExpenseBoardScreenState extends State<AddExpenseBoardScreen> {
   final formKey = GlobalKey<FormState>();
   final nameController = TextEditingController();
+  final dueDayController = TextEditingController();
+  BoardType type = BoardType.budget;
 
   @override
   void dispose() {
     nameController.dispose();
+    dueDayController.dispose();
     super.dispose();
   }
 
   void add() {
     if (!formKey.currentState!.validate()) return;
-    Navigator.pop(context, nameController.text.trim());
+    Navigator.pop(
+      context,
+      NewBoardDetails(
+        nameController.text.trim(),
+        type,
+        type == BoardType.bill ? int.parse(dueDayController.text.trim()) : null,
+      ),
+    );
   }
 
   @override
@@ -2040,6 +2418,42 @@ class _AddExpenseBoardScreenState extends State<AddExpenseBoardScreen> {
               onFieldSubmitted: (_) => add(),
             ),
             const SizedBox(height: 10),
+            SegmentedButton<BoardType>(
+              segments: const [
+                ButtonSegment(
+                  value: BoardType.budget,
+                  label: Text('Budget'),
+                  icon: Icon(Icons.savings_outlined),
+                ),
+                ButtonSegment(
+                  value: BoardType.bill,
+                  label: Text('Bill'),
+                  icon: Icon(Icons.receipt_long_outlined),
+                ),
+              ],
+              selected: {type},
+              onSelectionChanged: (value) => setState(() => type = value.first),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              type == BoardType.bill
+                  ? 'A fixed amount with a due date, like rent or electricity.'
+                  : 'A rough monthly limit, like groceries or shopping.',
+              style: const TextStyle(color: Colors.black54),
+            ),
+            if (type == BoardType.bill) ...[
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: dueDayController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Due day of the month',
+                  hintText: 'e.g. 5',
+                ),
+                validator: _validateDueDay,
+              ),
+            ],
+            const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: add,
               icon: const Icon(Icons.add),
@@ -2050,6 +2464,90 @@ class _AddExpenseBoardScreenState extends State<AddExpenseBoardScreen> {
       ),
     ),
   );
+}
+
+String? _validateDueDay(String? value) {
+  final day = int.tryParse(value?.trim() ?? '');
+  return day == null || day < 1 || day > 31
+      ? 'Enter a day from 1 to 31.'
+      : null;
+}
+
+/// Asks for a bill's due day when a board is switched to Bill.
+class _DueDayDialog extends StatefulWidget {
+  const _DueDayDialog();
+
+  @override
+  State<_DueDayDialog> createState() => _DueDayDialogState();
+}
+
+class _DueDayDialogState extends State<_DueDayDialog> {
+  final formKey = GlobalKey<FormState>();
+  final controller = TextEditingController();
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  void save() {
+    if (!formKey.currentState!.validate()) return;
+    Navigator.pop(context, int.parse(controller.text.trim()));
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('When is this bill due?'),
+    content: Form(
+      key: formKey,
+      child: TextFormField(
+        controller: controller,
+        autofocus: true,
+        keyboardType: TextInputType.number,
+        decoration: const InputDecoration(
+          labelText: 'Due day of the month',
+          hintText: 'e.g. 5',
+        ),
+        validator: _validateDueDay,
+        onFieldSubmitted: (_) => save(),
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Cancel'),
+      ),
+      FilledButton(onPressed: save, child: const Text('Make it a bill')),
+    ],
+  );
+}
+
+/// What a board's tile and summary say, and in which colour.
+/// Bill: "Due ₹X · 5 Nov" until spending reaches the bill amount, then
+/// "Paid ✓". Budget: "₹X left of ₹Y", or "Over budget by ₹X" in red.
+(String, Color) _boardStatus(
+  ExpenseBoard board,
+  int plannedMinor,
+  int spentMinor,
+  String currency,
+) {
+  String money(int minor) => Money.format(minor, currency: currency);
+  final left = plannedMinor - spentMinor;
+  if (board.type == BoardType.bill) {
+    if (plannedMinor == 0) return ('Amount not set', Colors.black45);
+    if (left <= 0) return ('Paid ✓', forestGreen);
+    final due = board.dueDateIn(DateTime.now());
+    return (
+      due == null
+          ? 'Due ${money(left)}'
+          : 'Due ${money(left)} · ${_shortDateLabel(due)}',
+      coral,
+    );
+  }
+  if (plannedMinor == 0) return ('Budget not set', forestGreen);
+  if (left < 0) return ('Over budget by ${money(-left)}', coral);
+  return ('${money(left)} left of ${money(plannedMinor)}', forestGreen);
 }
 
 class ProfileScreen extends StatelessWidget {
@@ -2488,6 +2986,10 @@ String _monthLabel(DateTime date) {
 
 String _dateLabel(DateTime date) =>
     '${date.day} ${_monthLabel(date).split(' ').first} ${date.year}';
+
+/// "14 Nov": day and short month, for compact rows.
+String _shortDateLabel(DateTime date) =>
+    '${date.day} ${_monthLabel(date).substring(0, 3)}';
 
 /// Display-only sign for a transaction amount. Calculations live in the model.
 String _signedAmount(FinanceTransaction transaction, String currency) {

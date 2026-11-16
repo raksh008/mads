@@ -83,6 +83,16 @@ class FinancialProfile {
       );
 }
 
+/// Budget: an approximate monthly limit. Bill: a fixed amount with a due day.
+enum BoardType {
+  budget,
+  bill;
+
+  /// Reads a saved type; anything unknown or missing is a budget.
+  static BoardType parse(Object? value) =>
+      value == BoardType.bill.name ? BoardType.bill : BoardType.budget;
+}
+
 class ExpenseBoard {
   final String id;
   final String name;
@@ -91,6 +101,10 @@ class ExpenseBoard {
   final String? logoUrl;
   final int accentColor;
   final int sortOrder;
+  final BoardType type;
+
+  /// Day of the month a bill is due (1–31). Null for budgets.
+  final int? dueDay;
 
   const ExpenseBoard({
     required this.id,
@@ -100,6 +114,8 @@ class ExpenseBoard {
     this.logoUrl,
     this.accentColor = 0xFF147D64,
     this.sortOrder = 0,
+    this.type = BoardType.budget,
+    this.dueDay,
   });
 
   ExpenseBoard copyWith({
@@ -109,6 +125,9 @@ class ExpenseBoard {
     String? logoUrl,
     int? accentColor,
     int? sortOrder,
+    BoardType? type,
+    int? dueDay,
+    bool clearDueDay = false,
   }) => ExpenseBoard(
     id: id,
     name: name ?? this.name,
@@ -117,7 +136,18 @@ class ExpenseBoard {
     logoUrl: logoUrl ?? this.logoUrl,
     accentColor: accentColor ?? this.accentColor,
     sortOrder: sortOrder ?? this.sortOrder,
+    type: type ?? this.type,
+    dueDay: clearDueDay ? null : (dueDay ?? this.dueDay),
   );
+
+  /// This month's due date for a bill, moved to the month's last day when
+  /// [dueDay] doesn't exist in it (e.g. 31 in November). Null for budgets.
+  DateTime? dueDateIn(DateTime month) {
+    final day = dueDay;
+    if (type != BoardType.bill || day == null) return null;
+    final lastDay = DateTime(month.year, month.month + 1, 0).day;
+    return DateTime(month.year, month.month, day > lastDay ? lastDay : day);
+  }
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -127,6 +157,8 @@ class ExpenseBoard {
     'logoUrl': logoUrl,
     'accentColor': accentColor,
     'sortOrder': sortOrder,
+    'type': type.name,
+    'dueDay': dueDay,
   };
 
   factory ExpenseBoard.fromJson(Map<String, dynamic> json) => ExpenseBoard(
@@ -137,6 +169,8 @@ class ExpenseBoard {
     logoUrl: json['logoUrl'] as String?,
     accentColor: _toInt(json['accentColor'], fallback: 0xFF147D64),
     sortOrder: _toInt(json['sortOrder']),
+    type: BoardType.parse(json['type']),
+    dueDay: json['dueDay'] == null ? null : _toInt(json['dueDay']),
   );
 }
 
@@ -166,6 +200,11 @@ class BudgetAllocation {
 }
 
 enum TransactionKind { expense, refund, income, transfer }
+
+/// [FinanceTransaction.source] for payments recorded with "Already paid /
+/// spent this?" → Yes when a board's plan is set. The money left the account
+/// before the balance was entered, so these never change Balance now.
+const alreadyPaidSource = 'already_paid';
 
 enum TransactionStatus { posted, pending }
 
@@ -283,17 +322,29 @@ class FinanceState {
       .where((item) => item.boardId == boardId && item.periodStart == period)
       .fold(0, (sum, item) => sum + item.amountMinor);
 
+  /// How much posted entries added after the balance check have taken out of
+  /// the account, net. Compared by time, so entries added later on the same
+  /// day as the check count. Expenses take money out; refunds and income put
+  /// it back (so they make this smaller); transfers never count. Payments
+  /// recorded as already paid ([alreadyPaidSource]) are already in the
+  /// balance, so they never count here (they still count as board spending).
   int get transactionsSinceBalanceSnapshotMinor {
     final currentProfile = profile;
     if (currentProfile == null) return 0;
-    final snapshotDate = _calendarDate(currentProfile.balanceAsOf);
     return transactions
         .where(
           (item) =>
               item.status == TransactionStatus.posted &&
-              _calendarDate(item.occurredAt).isAfter(snapshotDate),
+              item.source != alreadyPaidSource &&
+              item.occurredAt.isAfter(currentProfile.balanceAsOf),
         )
-        .fold(0, (sum, item) => sum + item.spendingEffectMinor);
+        .fold(
+          0,
+          (sum, item) =>
+              sum +
+              item.spendingEffectMinor -
+              (item.kind == TransactionKind.income ? item.amountMinor : 0),
+        );
   }
 
   int? get safeToSpendMinor {
@@ -382,11 +433,6 @@ class FinanceState {
     allocations: const [],
     transactions: const [],
   );
-}
-
-DateTime _calendarDate(DateTime value) {
-  final local = value.toLocal();
-  return DateTime(local.year, local.month, local.day);
 }
 
 String periodOf(DateTime date) =>

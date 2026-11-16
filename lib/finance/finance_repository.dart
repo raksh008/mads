@@ -250,7 +250,8 @@ class FinanceRepository {
         'balance_minor': profile.balanceMinor,
         'unpaid_commitments_minor': profile.unpaidCommitmentsMinor,
         'planned_savings_minor': profile.plannedSavingsMinor,
-        'balance_as_of': profile.balanceAsOf.toIso8601String().substring(0, 10),
+        // The full moment of the check, so same-day entries after it count.
+        'balance_as_of': profile.balanceAsOf.toUtc().toIso8601String(),
         'currency': profile.currency,
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       }, onConflict: 'user_id');
@@ -273,6 +274,8 @@ class FinanceRepository {
                     'accent_color':
                         '#${board.accentColor.toRadixString(16).padLeft(8, '0').substring(2)}',
                     'sort_order': board.sortOrder,
+                    'board_type': board.type.name,
+                    'due_day': board.dueDay,
                     'updated_at': DateTime.now().toUtc().toIso8601String(),
                   },
                 )
@@ -325,7 +328,8 @@ class FinanceRepository {
         unpaidCommitmentsMinor: _asInt(row['unpaid_commitments_minor']),
         plannedSavingsMinor: _asInt(row['planned_savings_minor']),
         balanceAsOf:
-            DateTime.tryParse('${row['balance_as_of']}') ?? DateTime.now(),
+            DateTime.tryParse('${row['balance_as_of']}')?.toLocal() ??
+            DateTime.now(),
         currency: row['currency'] as String? ?? 'INR',
       );
 
@@ -339,6 +343,8 @@ class FinanceRepository {
       logoUrl: row['logo_url'] as String?,
       accentColor: _colorFromHex(row['accent_color'] as String?),
       sortOrder: _asInt(row['sort_order']),
+      type: BoardType.parse(row['board_type']),
+      dueDay: row['due_day'] == null ? null : _asInt(row['due_day']),
     );
   }
 

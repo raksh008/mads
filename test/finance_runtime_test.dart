@@ -106,7 +106,7 @@ void main() {
       }
     });
 
-    test('income and transfer do not change spending or safe-to-spend', () {
+    test('income raises balance now; transfers change nothing', () {
       final base = _state().copyWith(
         transactions: [
           tx(TransactionKind.expense, 50_000),
@@ -123,9 +123,14 @@ void main() {
 
       expect(base.spentFor('groceries'), 40_000);
       expect(withOthers.spentFor('groceries'), 40_000);
-      expect(withOthers.transactionsSinceBalanceSnapshotMinor, 40_000);
-      expect(withOthers.safeToSpendMinor, base.safeToSpendMinor);
-      expect(withOthers.safeToSpendMinor, 300_000 - 40_000);
+      expect(base.safeToSpendMinor, 300_000 - 40_000);
+      // Income added after the check is money in the account; the transfer
+      // isn't counted.
+      expect(
+        withOthers.transactionsSinceBalanceSnapshotMinor,
+        40_000 - 7_000_000,
+      );
+      expect(withOthers.safeToSpendMinor, 300_000 - 40_000 + 7_000_000);
     });
   });
 
@@ -169,7 +174,7 @@ void main() {
           balanceMinor: 5_000_000,
           unpaidCommitmentsMinor: 2_250_000,
           plannedSavingsMinor: 1_000_000,
-          balanceAsOf: DateTime(2026, 11, 12),
+          balanceAsOf: DateTime(2026, 11, 12, 20), // checked at 8 pm
         ),
         transactions: [
           FinanceTransaction(
@@ -182,9 +187,16 @@ void main() {
           FinanceTransaction(
             id: 'snapshot-day',
             boardId: groceries.id,
-            description: 'Included on snapshot date',
+            description: 'Earlier on the check day: already in balance',
             amountMinor: 50_000,
             occurredAt: DateTime(2026, 11, 12, 18),
+          ),
+          FinanceTransaction(
+            id: 'snapshot-day-later',
+            boardId: groceries.id,
+            description: 'Later on the check day: counts',
+            amountMinor: 30_000,
+            occurredAt: DateTime(2026, 11, 12, 21),
           ),
           FinanceTransaction(
             id: 'after-snapshot',
@@ -212,8 +224,8 @@ void main() {
         ],
       );
 
-      expect(state.transactionsSinceBalanceSnapshotMinor, 130_000);
-      expect(state.safeToSpendMinor, 4_870_000);
+      expect(state.transactionsSinceBalanceSnapshotMinor, 160_000);
+      expect(state.safeToSpendMinor, 4_840_000);
       expect(state.profile!.monthlyBudgetPoolMinor, 7_000_000);
     });
 
@@ -434,6 +446,13 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Add expense'), findsNothing);
 
+    // The Budget/Bill switch pushes the rent button further down.
+    await tester.scrollUntilVisible(
+      find.text('Add rent paid'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Add rent paid'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField).last, '15000');
@@ -612,6 +631,13 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Groceries').first);
       await tester.pumpAndSettle();
+      // The Budget/Bill switch pushes the transactions further down.
+      await tester.scrollUntilVisible(
+        find.text('Transactions'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
       expect(find.text('Transactions'), findsOneWidget);
       expect(tester.takeException(), isNull);
 
@@ -648,6 +674,14 @@ void main() {
         ['Weekly groceries', '725.50'],
       );
       await tester.tap(find.text('Save transaction'));
+      await tester.pumpAndSettle();
+      // Onboarding entered only income, so the balance is ₹0 and nothing is
+      // left this month: the expense asks before spending from savings.
+      expect(
+        find.text('This goes into your savings. Spend from savings?'),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Yes, spend it'));
       await tester.pumpAndSettle();
 
       expect(find.byType(AddTransactionDialog), findsNothing);
