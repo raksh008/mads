@@ -77,35 +77,249 @@ class _FinancialProfileGateState extends State<FinancialProfileGate>
   Widget build(BuildContext context) => FutureBuilder<FinanceState>(
     future: stateFuture,
     builder: (context, snapshot) {
-      if (snapshot.connectionState == ConnectionState.waiting ||
-          !_splash.isCompleted) {
-        return const MadsSplash();
+      final userName = widget.user.userMetadata?['full_name'] as String?;
+      // The splash shows for its fixed time only; it no longer waits for data.
+      if (!_splash.isCompleted) return const MadsSplash();
+      if (snapshot.connectionState == ConnectionState.waiting) {
+        return _HomeLoadingSkeleton(userName: userName);
       }
       if (snapshot.hasError || !snapshot.hasData) {
-        return Scaffold(
-          body: Center(
+        return _HomeLoadError(
+          onRetry: () => setState(() {
+            stateFuture = _loadState();
+          }),
+        );
+      }
+      return HomeScreen(
+        repository: repository,
+        initialState: snapshot.data!,
+        userName: userName,
+        email: widget.user.email,
+      );
+    },
+  );
+}
+
+/// The home screen's layout while the finance data loads: the real header and
+/// greeting (known from login), pulsing placeholders where the cards go, and
+/// an inactive bottom bar.
+class _HomeLoadingSkeleton extends StatefulWidget {
+  final String? userName;
+
+  const _HomeLoadingSkeleton({this.userName});
+
+  @override
+  State<_HomeLoadingSkeleton> createState() => _HomeLoadingSkeletonState();
+}
+
+class _HomeLoadingSkeletonState extends State<_HomeLoadingSkeleton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Respect "reduce motion": keep the placeholders still.
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _pulse
+        ..stop()
+        ..value = 0.5;
+    } else if (!_pulse.isAnimating) {
+      _pulse.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  Widget _block(double height, {double? width, double radius = 20}) =>
+      FadeTransition(
+        opacity: Tween(begin: 0.45, end: 1.0).animate(_pulse),
+        child: Container(
+          height: height,
+          width: width,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(radius),
+          ),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final firstName = madsFirstName(widget.userName) ?? 'there';
+    return Scaffold(
+      body: SafeArea(
+        child: Semantics(
+          label: 'Loading your finances',
+          child: ListView(
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(22, 16, 22, 28),
+            children: [
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: MadsLogo(fontSize: 20),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Your finance pal.',
+                style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Hi, $firstName!',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  color: colors.onSurface,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                'Your money, organised for the month.',
+                style: TextStyle(color: colors.onSurfaceVariant),
+              ),
+              const SizedBox(height: 20),
+              _block(170, radius: 23), // safe to spend today
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(child: _block(110, radius: 18)), // monthly income
+                  const SizedBox(width: 12),
+                  Expanded(child: _block(110, radius: 18)), // spent
+                ],
+              ),
+              const SizedBox(height: 16),
+              _block(160), // Money Angel
+            ],
+          ),
+        ),
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: 0,
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home_rounded),
+            label: 'Home',
+            enabled: false,
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.grid_view_outlined),
+            label: 'Boards',
+            enabled: false,
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.auto_awesome_outlined),
+            label: 'Money Angel',
+            enabled: false,
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            label: 'Profile',
+            enabled: false,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Shown when the finance data fails to load, with a way to try again.
+class _HomeLoadError extends StatelessWidget {
+  final VoidCallback onRetry;
+
+  const _HomeLoadError({required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('Unable to open your finance space.'),
-                const SizedBox(height: 12),
-                FilledButton(
-                  onPressed: () => setState(() => stateFuture = _loadState()),
-                  child: const Text('Try again'),
+                Icon(Icons.cloud_off_outlined, size: 48, color: colors.primary),
+                const SizedBox(height: 18),
+                Text(
+                  "Couldn't load your finances",
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: colors.onSurface,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Check your internet connection and try again.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: colors.onSurfaceVariant, height: 1.4),
+                ),
+                const SizedBox(height: 22),
+                FilledButton.icon(
+                  onPressed: onRetry,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Try again'),
                 ),
               ],
             ),
           ),
-        );
-      }
-      final state = snapshot.data!;
-      return HomeScreen(
-        repository: repository,
-        initialState: state,
-        userName: widget.user.userMetadata?['full_name'] as String?,
-        email: widget.user.email,
-      );
-    },
+        ),
+      ),
+    );
+  }
+}
+
+/// Asks for a purchase amount for "Check before you buy". It owns its text
+/// controller and disposes it only once the dialog has fully closed, so the
+/// closing animation never uses a disposed controller.
+class _PurchaseAmountDialog extends StatefulWidget {
+  const _PurchaseAmountDialog();
+
+  @override
+  State<_PurchaseAmountDialog> createState() => _PurchaseAmountDialogState();
+}
+
+class _PurchaseAmountDialogState extends State<_PurchaseAmountDialog> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() => Navigator.pop(context, Money.parseMinor(_controller.text));
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Check a purchase'),
+    content: TextField(
+      controller: _controller,
+      autofocus: true,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      decoration: const InputDecoration(
+        labelText: 'Purchase amount',
+        prefixText: '₹ ',
+      ),
+      onSubmitted: (_) => _submit(),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Cancel'),
+      ),
+      FilledButton(onPressed: _submit, child: const Text('Check')),
+    ],
   );
 }
 
@@ -1154,43 +1368,27 @@ class _HomeScreenState extends State<HomeScreen> {
   );
 
   Future<void> _spendCheck() async {
-    final controller = TextEditingController();
     final amount = await showDialog<int>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Check a purchase'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(
-            labelText: 'Purchase amount',
-            prefixText: '₹ ',
-          ),
-          onSubmitted: (_) =>
-              Navigator.pop(context, Money.parseMinor(controller.text)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () =>
-                Navigator.pop(context, Money.parseMinor(controller.text)),
-            child: const Text('Check'),
-          ),
-        ],
-      ),
+      builder: (context) => const _PurchaseAmountDialog(),
     );
-    controller.dispose();
     if (amount == null || !mounted) return;
-    final safe = state.safeToSpendMinor;
-    final message = safe == null
-        ? 'Add your current balance to check this purchase.'
-        : amount <= safe
-        ? 'This is within the current available amount. Check the board budget too.'
-        : 'This is ${Money.format(amount - safe, currency: state.profile!.currency)} above the current available amount.';
+    // Same free-to-spend figure as the home screen's Safe to Spend card.
+    final free = computeSafeToSpend(
+      state,
+      DateTime.now(),
+      excludedBoardIds: _excludedBoards,
+    ).freeToSpendMinor;
+    String money(int minor) =>
+        Money.format(minor, currency: state.profile?.currency ?? 'INR');
+    final message = free == null
+        ? 'Add your monthly income and current balance to check this purchase.'
+        : amount <= free
+        ? 'This fits in your free money this month: ${money(free)} free, '
+              '${money(free - amount)} left after it.'
+        : 'This is ${money(amount - free)} more than your free money this '
+              'month (${money(free)}). It would use money kept for savings '
+              'or your boards.';
     showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
