@@ -8,10 +8,14 @@ class MadsConversationScreen extends StatefulWidget {
   final MadsAssistant assistant;
   final String? initialQuestion;
 
+  /// The logged-in user; their personality choice is saved under this id.
+  final String userId;
+
   const MadsConversationScreen({
     super.key,
     required this.contextData,
     required this.assistant,
+    required this.userId,
     this.initialQuestion,
   });
 
@@ -24,10 +28,22 @@ class _MadsConversationScreenState extends State<MadsConversationScreen> {
   final _scrollController = ScrollController();
   late final List<MadsConversationMessage> _messages;
   bool _sending = false;
+  MadsPersonality _personality = MadsPersonality.friendly;
+
+  Future<void> _loadPersonality() async {
+    final saved = await MadsPersonalityStore.load(widget.userId);
+    if (mounted) setState(() => _personality = saved);
+  }
+
+  void _choosePersonality(MadsPersonality personality) {
+    setState(() => _personality = personality);
+    MadsPersonalityStore.save(widget.userId, personality);
+  }
 
   @override
   void initState() {
     super.initState();
+    final personalityLoaded = _loadPersonality();
     final hasProfile =
         widget.contextData.facts['monthlyIncome'] != null ||
         widget.contextData.facts['balanceSnapshot'] != null;
@@ -41,7 +57,10 @@ class _MadsConversationScreenState extends State<MadsConversationScreen> {
     ];
     final question = widget.initialQuestion?.trim();
     if (question != null && question.isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _send(question));
+      // Wait for the saved personality so the first reply uses it.
+      personalityLoaded.then((_) {
+        if (mounted) _send(question);
+      });
     }
   }
 
@@ -71,6 +90,7 @@ class _MadsConversationScreenState extends State<MadsConversationScreen> {
       final reply = await widget.assistant.reply(
         context: widget.contextData,
         conversation: history,
+        personality: _personality,
       );
       if (!mounted) return;
       setState(() {
@@ -135,6 +155,7 @@ class _MadsConversationScreenState extends State<MadsConversationScreen> {
               ),
             ),
           ),
+          _personalityPicker(context),
           Expanded(
             child: ListView.builder(
               controller: _scrollController,
@@ -160,6 +181,47 @@ class _MadsConversationScreenState extends State<MadsConversationScreen> {
       ),
     ),
   );
+
+  Widget _personalityPicker(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Semantics(
+            header: true,
+            child: Text(
+              'Personality',
+              style: TextStyle(
+                color: colors.onSurface,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              for (final personality in MadsPersonality.values)
+                ChoiceChip(
+                  label: Text(personality.label),
+                  selected: _personality == personality,
+                  onSelected: (_) => _choosePersonality(personality),
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            _personality.description,
+            style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _composer(BuildContext context) => Padding(
     padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),

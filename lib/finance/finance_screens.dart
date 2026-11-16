@@ -746,7 +746,11 @@ class _HomeScreenState extends State<HomeScreen> {
       context,
       MaterialPageRoute(
         builder: (_) => MadsConversationScreen(
-          contextData: MadsFinanceContext.fromState(state),
+          userId: widget.repository.userId,
+          contextData: MadsFinanceContext.fromState(
+          state,
+          excludedBoardIds: _excludedBoards,
+        ),
           assistant:
               widget.assistant ??
               SupabaseMadsAssistant(widget.repository.client),
@@ -763,7 +767,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final Widget body = switch (_tab) {
       1 => _boardsTab(),
       2 => MadsConversationScreen(
-        contextData: MadsFinanceContext.fromState(state),
+        userId: widget.repository.userId,
+        contextData: MadsFinanceContext.fromState(
+          state,
+          excludedBoardIds: _excludedBoards,
+        ),
         assistant:
             widget.assistant ?? SupabaseMadsAssistant(widget.repository.client),
       ),

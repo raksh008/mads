@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mads/branding.dart';
 import 'package:mads/finance/finance_assistant.dart';
+import 'package:mads/finance/finance_assistant_screen.dart';
 import 'package:mads/finance/finance_models.dart';
 import 'package:mads/finance/finance_repository.dart';
 import 'package:mads/finance/finance_screens.dart';
 import 'package:mads/main.dart' as app;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class _FakeFinanceRepository implements FinanceRepository {
@@ -41,14 +43,17 @@ class _FakeFinanceRepository implements FinanceRepository {
 class _FakeMadsAssistant implements MadsAssistant {
   MadsFinanceContext? lastContext;
   List<MadsConversationMessage>? lastConversation;
+  MadsPersonality? lastPersonality;
 
   @override
   Future<String> reply({
     required MadsFinanceContext context,
     required List<MadsConversationMessage> conversation,
+    MadsPersonality personality = MadsPersonality.friendly,
   }) async {
     lastContext = context;
     lastConversation = conversation;
+    lastPersonality = personality;
     return 'I can help you make sense of the records you have saved.';
   }
 }
@@ -261,6 +266,18 @@ void main() {
         expect(context.facts['monthlyIncome'], '₹80,000');
         expect(context.facts['balanceSnapshot'], '₹3,000');
         expect(context.facts['postedSpendingThisMonth'], '₹199');
+        expect(context.facts['balanceNow'], '₹3,000');
+        expect(context.facts['freeToSpendThisMonth'], '₹1,000');
+        expect(context.facts['safeToSpendToday'], '₹52.63');
+        expect(context.facts['daysLeftInMonthIncludingToday'], 19);
+        expect(context.facts.containsKey('safeToSpend'), isFalse);
+        final boards = (context.facts['boardsThisMonth'] as List)
+            .cast<Map<String, dynamic>>();
+        final subscriptionsFacts = boards.firstWhere(
+          (board) => board['board'] == 'Subscriptions',
+        );
+        expect(subscriptionsFacts['spentThisMonth'], '₹199');
+        expect(subscriptionsFacts['status'], isNotEmpty);
         expect(context.facts['actualSavingsProgress'], contains('not tracked'));
         expect(
           context.facts['calculationNotes'],
@@ -272,13 +289,51 @@ void main() {
           )['questionSpecificVerifiedCheck'],
           {
             'purchaseAmount': '₹1,000',
-            'safeToSpendBeforePurchase': '₹3,000',
-            'affordableFromRecordedAvailableAmount': true,
-            'remainingAfterPurchase': '₹2,000',
+            'freeToSpendBeforePurchase': '₹1,000',
+            'fitsWithinFreeToSpend': true,
+            'freeToSpendAfterPurchase': '₹0',
           },
         );
       },
     );
+
+    test('personality is saved per user and defaults to Friendly', () async {
+      SharedPreferences.setMockInitialValues({});
+      expect(
+        await MadsPersonalityStore.load('user-a'),
+        MadsPersonality.friendly,
+      );
+      await MadsPersonalityStore.save('user-a', MadsPersonality.witch);
+      await MadsPersonalityStore.save('user-b', MadsPersonality.sarcastic);
+      expect(await MadsPersonalityStore.load('user-a'), MadsPersonality.witch);
+      expect(
+        await MadsPersonalityStore.load('user-b'),
+        MadsPersonality.sarcastic,
+      );
+      expect(
+        MadsPersonality.fromWireName('something-else'),
+        MadsPersonality.friendly,
+      );
+    });
+
+    test('a "what can I spend today" question adds no purchase check', () {
+      final context = MadsFinanceContext.fromState(
+        _state(),
+        now: DateTime(2026, 11, 12),
+      );
+      expect(
+        context
+            .factsForQuestion('What can I spend today?')
+            .containsKey('questionSpecificVerifiedCheck'),
+        isFalse,
+      );
+      expect(
+        context.factsForQuestion(
+          'Can I afford new shoes?',
+        )['questionSpecificVerifiedCheck'],
+        contains('purchase amount'),
+      );
+    });
 
     test(
       'category spending counts posted expenses and subtracts refunds once',
@@ -349,6 +404,102 @@ void main() {
     expect(find.textContaining('SPENT THIS MONTH'), findsOneWidget);
     expect(tester.takeException(), isNull);
     madsThemeMode.value = ThemeMode.system;
+  });
+
+  testWidgets('chat personality picker loads, saves and is sent', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'mads_test-user_money_angel_personality': 'sarcastic',
+    });
+    final assistant = _FakeMadsAssistant();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MadsConversationScreen(
+          userId: 'test-user',
+          contextData: MadsFinanceContext.fromState(_state()),
+          assistant: assistant,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The saved choice is shown.
+    expect(
+      tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Sarcastic')).selected,
+      isTrue,
+    );
+
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Woo Woo Witch'));
+    await tester.pumpAndSettle();
+    expect(find.text(MadsPersonality.witch.description), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), 'How is my month?');
+    await tester.tap(find.byTooltip('Send message'));
+    await tester.pumpAndSettle();
+
+    expect(assistant.lastPersonality, MadsPersonality.witch);
+    expect(
+      await MadsPersonalityStore.load('test-user'),
+      MadsPersonality.witch,
+    );
+  });
+
+  testWidgets('check before you buy uses free to spend and does not crash', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final repository = _FakeFinanceRepository(_state());
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HomeScreen(
+          repository: repository,
+          initialState: repository.state,
+          userName: 'Test User',
+          assistant: _FakeMadsAssistant(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    Future<void> check(String amount, {required bool useEnter}) async {
+      await tester.scrollUntilVisible(
+        find.text('Check before you buy').hitTestable(),
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text('Check before you buy'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).last, amount);
+      if (useEnter) {
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+      } else {
+        await tester.tap(find.text('Check'));
+      }
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    }
+
+    // Free to spend = ₹3,000 balance − ₹2,000 savings − ₹0 for boards.
+    await check('20000', useEnter: true);
+    expect(
+      find.text(
+        'This is ₹19,000 more than your free money this month (₹1,000). '
+        'It would use money kept for savings or your boards.',
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Got it'));
+    await tester.pumpAndSettle();
+
+    await check('500', useEnter: false);
+    expect(
+      find.text(
+        'This fits in your free money this month: ₹1,000 free, ₹500 left '
+        'after it.',
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('welcome opens the login screen', (tester) async {
