@@ -17,7 +17,7 @@ class MadsFinanceContext {
   final Map<String, dynamic> facts;
   final String currency;
 
-  /// Free to spend this month, as the home screen shows it (never below 0).
+  /// Free to spend this month, unclamped: negative when there's a shortfall.
   /// Purchase checks are measured against this.
   final int? freeToSpendMinor;
 
@@ -72,7 +72,8 @@ class MadsFinanceContext {
 
     return MadsFinanceContext(
       currency: currency,
-      freeToSpendMinor: safe.freeToSpendMinor,
+      // The real figure (can be negative) so purchase checks see the shortfall.
+      freeToSpendMinor: safe.freeMinor,
       facts: {
         'currency': currency,
         'month': '${date.year}-${date.month.toString().padLeft(2, '0')}',
@@ -91,6 +92,7 @@ class MadsFinanceContext {
         'savingsKeptAside': format(safe.savingsKeptMinor),
         'keptForBoards': format(safe.keptForBoardsMinor),
         'freeToSpendThisMonth': format(safe.freeToSpendMinor),
+        'shortfallThisMonth': format(safe.shortfallMinor),
         'safeToSpendToday': format(safe.safeTodayDisplayMinor),
         'daysLeftInMonthIncludingToday': safe.daysLeft,
         'postedTransactionsAfterBalanceSnapshot': profile == null
@@ -131,7 +133,7 @@ class MadsFinanceContext {
           'Balance now is the balance snapshot adjusted for posted transactions dated after it.',
           'Transactions dated on or before the snapshot are treated as already reflected.',
           'The monthly savings target is a planning goal, not savings already achieved.',
-          'Free to spend this month = balance now minus savings kept aside minus money kept for boards (shown as zero if that is negative).',
+          'Free to spend this month = balance now minus savings kept aside minus money kept for boards (shown as zero if that is negative). When it is negative, shortfallThisMonth says by how much; mention it gently and never scold.',
           'Safe to spend today = free to spend this month divided by the days left in the month, including today. This is the figure on the home screen.',
           'When asked what can be spent today, quote safe to spend today, not the balance now.',
           'Money that can still be planned for a board, or spent freely, is the free to spend this month figure. There is no other unassigned or unplanned pool; never suggest moving money that is not part of free to spend.',

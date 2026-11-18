@@ -140,7 +140,7 @@ void main() {
     expect(editable.controller.text, '60000');
   });
 
-  testWidgets('no free money shows ₹0 and the planned-for message', (
+  testWidgets('a shortfall shows ₹0 today with a gentle, real-amount message', (
     tester,
   ) async {
     // Savings of ₹60,000 keeps the whole ₹55,000 balance aside.
@@ -155,21 +155,20 @@ void main() {
       ),
     );
     await _pumpHome(tester, state);
+    // Balance now is ₹55,000 against ₹60,000 of savings: ₹5,000 short.
     expect(
-      find.text(
-        'Everything is planned for. Nothing extra to spend freely today.',
-      ),
+      find.textContaining("You're ₹5,000 short of what is set aside"),
       findsOneWidget,
     );
-    expect(_rowValue('Free to spend', '₹0'), findsOneWidget);
-    // Nothing negative or "spent more than" on the card itself.
+    expect(_rowValue('Free to spend', '−₹5,000'), findsOneWidget);
+    // No scolding wording on the card itself.
     final card = find
         .ancestor(
           of: find.text('SAFE TO SPEND TODAY'),
           matching: find.byType(Column),
         )
         .first;
-    for (final text in ['−₹', 'more than', 'Over by', 'Short by']) {
+    for (final text in ['more than', 'Over by', 'Short by']) {
       expect(
         find.descendant(of: card, matching: find.textContaining(text)),
         findsNothing,

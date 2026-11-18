@@ -46,8 +46,16 @@ class SafeToSpend {
     this.savingsProgress,
   });
 
-  /// Free money for display: never below 0.
+  /// Free money for display: never below 0. Use [shortfallMinor] to say how
+  /// far below zero it really is.
   int? get freeToSpendMinor => _atLeastZero(freeMinor);
+
+  /// How far past savings and board money the balance is, or null when
+  /// there's no shortfall (or it can't be worked out).
+  int? get shortfallMinor {
+    final free = freeMinor;
+    return free == null || free >= 0 ? null : -free;
+  }
 
   /// Safe to spend today for display: never below 0.
   int? get safeTodayDisplayMinor => _atLeastZero(safeTodayMinor);
