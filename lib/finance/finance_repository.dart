@@ -392,7 +392,10 @@ FinanceTransaction transactionFromCloudRow(Map<String, dynamic> row) =>
       boardId: '${row['board_id']}',
       description: '${row['description']}',
       amountMinor: _asInt(row['amount_minor']),
-      occurredAt: DateTime.tryParse('${row['occurred_at']}') ?? DateTime.now(),
+      // Cloud timestamps are UTC; month and day must follow the user's clock.
+      occurredAt:
+          DateTime.tryParse('${row['occurred_at']}')?.toLocal() ??
+          DateTime.now(),
       kind:
           TransactionKind.values.asNameMap()[row['transaction_kind']] ??
           TransactionKind.expense,

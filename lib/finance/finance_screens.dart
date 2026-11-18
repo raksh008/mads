@@ -298,20 +298,32 @@ class _PurchaseAmountDialogState extends State<_PurchaseAmountDialog> {
     super.dispose();
   }
 
-  void _submit() => Navigator.pop(context, Money.parseMinor(_controller.text));
+  final _formKey = GlobalKey<FormState>();
+  bool _closing = false;
+
+  void _submit() {
+    // An invalid amount shows an error instead of silently closing.
+    if (_closing || !_formKey.currentState!.validate()) return;
+    _closing = true;
+    Navigator.pop(context, Money.parseMinor(_controller.text));
+  }
 
   @override
   Widget build(BuildContext context) => AlertDialog(
     title: const Text('Check a purchase'),
-    content: TextField(
-      controller: _controller,
-      autofocus: true,
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      decoration: const InputDecoration(
-        labelText: 'Purchase amount',
-        prefixText: '₹ ',
+    content: Form(
+      key: _formKey,
+      child: TextFormField(
+        controller: _controller,
+        autofocus: true,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        decoration: const InputDecoration(
+          labelText: 'Purchase amount',
+          prefixText: '₹ ',
+        ),
+        validator: _amountError,
+        onFieldSubmitted: (_) => _submit(),
       ),
-      onSubmitted: (_) => _submit(),
     ),
     actions: [
       TextButton(
@@ -352,14 +364,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   void initState() {
     super.initState();
     final profile = widget.initialProfile;
+    // A first-time profile starts with empty fields, not a "0" the user has
+    // to delete (and that income validation would otherwise have to reject).
     incomeController = TextEditingController(
-      text: _minorInput(profile?.monthlyIncomeMinor ?? 0),
+      text: profile == null ? '' : _minorInput(profile.monthlyIncomeMinor),
     );
     balanceController = TextEditingController(
-      text: _minorInput(profile?.balanceMinor ?? 0),
+      text: profile == null ? '' : _minorInput(profile.balanceMinor),
     );
     savingsController = TextEditingController(
-      text: _minorInput(profile?.plannedSavingsMinor ?? 0),
+      text: profile == null ? '' : _minorInput(profile.plannedSavingsMinor),
     );
     balanceAsOf = profile?.balanceAsOf ?? DateTime.now();
     if (widget.focusBalance) {
@@ -439,8 +453,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         if (value == null || value.trim().isEmpty) {
           return required ? 'Enter your monthly income.' : null;
         }
-        if (Money.parseMinor(value) == null) {
-          return 'Enter a valid amount with up to two decimal places.';
+        final amount = Money.parseMinor(value);
+        if (amount == null) {
+          return 'Enter a number like 25000 or 25000.50 (up to two decimals).';
+        }
+        // Income of 0 can never produce a spending limit, so don't accept it.
+        if (required && amount <= 0) {
+          return 'Monthly income must be more than ₹0.';
         }
         return null;
       },
@@ -585,6 +604,14 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     state = widget.initialState;
+    // A new month starts with last month's board plans, still editable.
+    final carried = state.withAllocationsCarriedForward(DateTime.now());
+    if (!identical(carried, state)) {
+      state = carried;
+      Future.microtask(() {
+        if (mounted) _save(carried);
+      });
+    }
     _refreshCatalogIcons();
     BoardPlanChoices.load().then((choices) {
       if (mounted) setState(() => planChoices = choices);
@@ -601,8 +628,104 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _save(FinanceState value) async {
     setState(() => state = value);
-    await widget.repository.save(value);
+    try {
+      await widget.repository.save(value);
+    } catch (_) {
+      if (mounted) _showSaveFailed(context);
+    }
     if (mounted) setState(() {});
+  }
+
+  /// Quick path for the main action: pick a board, enter an expense, and see
+  /// the updated spending limit. Boards still have their own Add expense.
+  Future<void> _logSpending() async {
+    if (state.boards.isEmpty) {
+      setState(() => _tab = 1);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Add a board first, then log spending.')),
+      );
+      return;
+    }
+    final board = await showModalBottomSheet<ExpenseBoard>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(24, 0, 24, 8),
+              child: Text(
+                'What did you spend on?',
+                style: TextStyle(
+                  color: madsSoftWhite,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            for (final item in state.boards)
+              ListTile(
+                leading: BoardIconView(
+                  iconKey: item.iconKey,
+                  accentColor: item.accentColor,
+                  logoUrl: item.logoUrl,
+                  size: 22,
+                ),
+                title: Text(item.name),
+                onTap: () => Navigator.pop(context, item),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (board == null || !mounted) return;
+    final entry = await showDialog<_TransactionEntry>(
+      context: context,
+      builder: (_) => AddTransactionDialog(
+        boardName: board.name,
+        aboveSavingsMinor: computeSafeToSpend(
+          state,
+          DateTime.now(),
+        ).aboveSavingsMinor,
+      ),
+    );
+    if (entry == null || !mounted) return;
+    final merchant = await widget.repository.resolveCatalogItem(
+      entry.description,
+    );
+    if (!mounted) return;
+    final transaction = FinanceTransaction(
+      id: newId(),
+      boardId: board.id,
+      description: entry.description,
+      amountMinor: entry.amountMinor,
+      occurredAt: DateTime.now(),
+      kind: entry.kind,
+      merchantKey: merchant.merchantKey,
+      iconKey: merchant.iconKey,
+      logoUrl: merchant.logoUrl,
+      accentColor: merchant.accentColor,
+    );
+    await _save(state.copyWith(transactions: [transaction, ...state.transactions]));
+    if (!mounted) return;
+    final currency = state.profile?.currency ?? 'INR';
+    final left = computeSafeToSpend(
+      state,
+      DateTime.now(),
+      excludedBoardIds: _excludedBoards,
+    ).safeTodayDisplayMinor;
+    final what = entry.kind == TransactionKind.refund ? 'Refund' : 'Expense';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '$what of ${Money.format(entry.amountMinor, currency: currency)} '
+          'saved to ${board.name}.'
+          '${left == null ? '' : ' Safe to spend today: ${Money.format(left, currency: currency)}.'}',
+        ),
+      ),
+    );
   }
 
   Future<void> _refreshCatalogIcons() async {
@@ -792,6 +915,14 @@ class _HomeScreenState extends State<HomeScreen> {
     };
     return Scaffold(
       body: body,
+      // The main action is always one tap away on Home.
+      floatingActionButton: _tab == 0
+          ? FloatingActionButton.extended(
+              onPressed: _logSpending,
+              icon: const Icon(Icons.add),
+              label: const Text('Log spending'),
+            )
+          : null,
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tab,
         onDestinationSelected: (index) => setState(() => _tab = index),
@@ -898,7 +1029,9 @@ class _HomeScreenState extends State<HomeScreen> {
         physics: const ClampingScrollPhysics(),
         slivers: [
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(22, 16, 22, 28),
+            // Extra room at the bottom so the Log spending button never
+            // covers the last row.
+            padding: const EdgeInsets.fromLTRB(22, 16, 22, 96),
             sliver: SliverList.list(
               children: [
                 Row(
@@ -940,6 +1073,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 20),
                 _safeToSpendCard(profile, currency),
+                const SizedBox(height: 12),
                 const SizedBox(height: 12),
                 IntrinsicHeight(
                   child: Row(
@@ -1125,10 +1259,30 @@ class _HomeScreenState extends State<HomeScreen> {
     final free = safe.freeToSpendMinor;
     final String headline;
     final String explanation;
+    // When the number can't be trusted yet, tapping the card fixes it.
+    var needsFix = false;
+    var fixBalance = false;
     if (free == null) {
       headline = 'Set up your money profile';
       explanation =
-          'Add your monthly income, current balance and savings target.';
+          'Add your monthly income, current balance and savings target. '
+          'Tap here to start.';
+      needsFix = true;
+    } else if ((safe.balanceNowMinor ?? 0) <= 0) {
+      // Usually a balance that was left blank, not a real empty account.
+      headline = Money.format(0, currency: currency);
+      explanation =
+          'Your current balance is ₹0, so there is nothing to spend. '
+          'Tap here to add your real balance.';
+      needsFix = true;
+      fixBalance = true;
+    } else if (safe.shortfallMinor != null) {
+      headline = Money.format(0, currency: currency);
+      explanation =
+          "You're ${Money.format(safe.shortfallMinor!, currency: currency)} "
+          'short of what is set aside for savings and your boards this '
+          'month. Nothing extra to spend freely today. Easing a plan or '
+          'adding income can close the gap.';
     } else if (free == 0) {
       headline = Money.format(0, currency: currency);
       explanation =
@@ -1139,7 +1293,7 @@ class _HomeScreenState extends State<HomeScreen> {
           'Money not kept aside for savings or your boards, spread evenly '
           'over the days left, including today.';
     }
-    return Container(
+    final card = Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
@@ -1227,6 +1381,15 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
+    if (!needsFix) return card;
+    return Semantics(
+      button: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _editFinancialProfile(focusBalance: fixBalance),
+        child: card,
+      ),
+    );
   }
 
   /// The rows behind Safe to Spend, shown when "See how this is worked out"
@@ -1237,7 +1400,8 @@ class _HomeScreenState extends State<HomeScreen> {
     String currency,
   ) {
     final balance = safe.balanceNowMinor;
-    final free = safe.freeToSpendMinor;
+    // The real figure, so a shortfall shows as a negative here.
+    final free = safe.freeMinor;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1432,11 +1596,16 @@ class _HomeScreenState extends State<HomeScreen> {
       state,
       DateTime.now(),
       excludedBoardIds: _excludedBoards,
-    ).freeToSpendMinor;
+    ).freeMinor;
     String money(int minor) =>
         Money.format(minor, currency: state.profile?.currency ?? 'INR');
     final message = free == null
         ? 'Add your monthly income and current balance to check this purchase.'
+        : free < 0
+        ? "You're already ${money(-free)} short of what is set aside for "
+              'savings and your boards this month, so this ${money(amount)} '
+              'would add to that. It may be worth waiting or easing a plan '
+              'first.'
         : amount <= free
         ? 'This fits in your free money this month: ${money(free)} free, '
               '${money(free - amount)} left after it.'
@@ -1593,7 +1762,11 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
   Future<void> _persist(FinanceState next) async {
     setState(() => state = next);
     widget.onStateChanged(next);
-    await widget.repository.save(next);
+    try {
+      await widget.repository.save(next);
+    } catch (_) {
+      if (mounted) _showSaveFailed(context);
+    }
     if (mounted) setState(() {});
   }
 
@@ -1703,6 +1876,11 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
     await _persist(
       state.copyWith(transactions: [transaction, ...state.transactions]),
     );
+    if (mounted) {
+      _showMessage(
+        entry.kind == TransactionKind.refund ? 'Refund saved.' : 'Expense saved.',
+      );
+    }
   }
 
   bool get _isRent =>
@@ -2372,7 +2550,8 @@ class _ExpenseBoardScreenState extends State<ExpenseBoardScreen> {
               ),
         title: Text(transaction.description),
         subtitle: Text(
-          '${_kindPrefix(transaction)}${_dateLabel(transaction.occurredAt)} · ${transaction.status.name}',
+          '${_kindPrefix(transaction)}${_dateLabel(transaction.occurredAt)}'
+          '${transaction.status == TransactionStatus.pending ? ' · pending' : ''}',
         ),
         trailing: Text(
           _signedAmount(transaction, currency),
@@ -2451,8 +2630,11 @@ class _RentAmountDialogState extends State<_RentAmountDialog> {
     super.dispose();
   }
 
+  bool _closing = false;
+
   void save() {
-    if (!formKey.currentState!.validate()) return;
+    if (_closing || !formKey.currentState!.validate()) return;
+    _closing = true;
     Navigator.pop(context, Money.parseMinor(amountController.text.trim()));
   }
 
@@ -2469,12 +2651,7 @@ class _RentAmountDialogState extends State<_RentAmountDialog> {
           labelText: widget.label,
           prefixText: '₹ ',
         ),
-        validator: (value) {
-          final amount = value == null ? null : Money.parseMinor(value);
-          return amount == null || amount <= 0
-              ? 'Enter an amount above ₹0.'
-              : null;
-        },
+        validator: _amountError,
         onFieldSubmitted: (_) => save(),
       ),
     ),
@@ -2536,8 +2713,10 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
     super.dispose();
   }
 
+  bool _closing = false;
+
   Future<void> save() async {
-    if (!formKey.currentState!.validate()) return;
+    if (_closing || !formKey.currentState!.validate()) return;
     final amount = Money.parseMinor(amountController.text.trim())!;
     final aboveSavings = widget.aboveSavingsMinor;
     if (kind == TransactionKind.expense &&
@@ -2562,9 +2741,19 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
       // Cancel leaves the entry unsaved, with the form still open to edit.
       if (spendFromSavings != true || !mounted) return;
     }
+    // A second tap while the dialog is closing must not pop the screen
+    // underneath it.
+    if (_closing) return;
+    _closing = true;
+    // Leaving the description blank is fine: it falls back to the board name.
+    final description = descriptionController.text.trim();
     Navigator.pop(
       context,
-      _TransactionEntry(descriptionController.text.trim(), amount, kind),
+      _TransactionEntry(
+        description.isEmpty ? widget.boardName : description,
+        amount,
+        kind,
+      ),
     );
   }
 
@@ -2592,18 +2781,17 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
             selected: {kind},
             onSelectionChanged: (value) => setState(() => kind = value.first),
           ),
+          const SizedBox(height: 12),
           TextFormField(
             controller: descriptionController,
             autofocus: widget.initialDescription == null,
             textCapitalization: TextCapitalization.sentences,
             decoration: InputDecoration(
-              labelText: 'What was it for?',
+              labelText: 'What was it for? (optional)',
               hintText: widget.boardName,
             ),
-            validator: (value) => value == null || value.trim().isEmpty
-                ? 'Enter a description.'
-                : null,
           ),
+          const SizedBox(height: 8),
           TextFormField(
             controller: amountController,
             autofocus: widget.initialDescription != null,
@@ -2612,12 +2800,7 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
               labelText: 'Amount',
               prefixText: '₹ ',
             ),
-            validator: (value) {
-              final amount = value == null ? null : Money.parseMinor(value);
-              return amount == null || amount <= 0
-                  ? 'Enter an amount above ₹0.'
-                  : null;
-            },
+            validator: _amountError,
             onFieldSubmitted: (_) => save(),
           ),
         ],
@@ -3198,6 +3381,23 @@ class BoardIconView extends StatelessWidget {
     ),
   );
 }
+
+/// Validator for money amounts that must be above zero.
+String? _amountError(String? value) {
+  final amount = value == null ? null : Money.parseMinor(value);
+  if (amount == null) return 'Enter a number, like 250 or 250.50.';
+  if (amount <= 0) return 'Enter an amount above ₹0.';
+  return null;
+}
+
+void _showSaveFailed(BuildContext context) =>
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          "Couldn't save your changes on this device. Please try again.",
+        ),
+      ),
+    );
 
 ThemeMode _themeModeFromString(String value) => switch (value) {
   'light' => ThemeMode.light,

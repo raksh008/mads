@@ -353,6 +353,33 @@ class FinanceState {
     return currentProfile.balanceMinor - transactionsSinceBalanceSnapshotMinor;
   }
 
+  /// Copies each board's most recent earlier allocation into the month of
+  /// [now] when that board has no allocation for it yet, so a new month
+  /// starts with last month's plans. A board that already has an entry for
+  /// the month (even ₹0) is left alone, so edits stick. Returns this same
+  /// object when there is nothing to copy.
+  FinanceState withAllocationsCarriedForward(DateTime now) {
+    final month = periodOf(now);
+    final added = <BudgetAllocation>[];
+    for (final board in boards) {
+      final mine = allocations.where((a) => a.boardId == board.id);
+      if (mine.any((a) => a.periodStart == month)) continue;
+      // Periods are zero-padded "YYYY-MM-01", so string order is date order.
+      final earlier = mine.where((a) => a.periodStart.compareTo(month) < 0).toList()
+        ..sort((a, b) => b.periodStart.compareTo(a.periodStart));
+      if (earlier.isEmpty || earlier.first.amountMinor <= 0) continue;
+      added.add(
+        BudgetAllocation(
+          boardId: board.id,
+          periodStart: month,
+          amountMinor: earlier.first.amountMinor,
+        ),
+      );
+    }
+    if (added.isEmpty) return this;
+    return copyWith(allocations: [...allocations, ...added]);
+  }
+
   int spentFor(String boardId, {String? period}) => transactions
       .where((item) {
         if (item.boardId != boardId ||
