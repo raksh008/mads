@@ -359,10 +359,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
         'Account created. If email confirmation is enabled, verify your email, then log in.',
       );
 
+      // Keep the first route (the auth gate) under the login screen. Removing
+      // every route left nothing to show Home after a successful login, so the
+      // screen stayed on the login form until the app was restarted.
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => LoginScreen(initialEmail: email)),
-        (route) => false,
+        (route) => route.isFirst,
       );
     } on AuthException catch (error) {
       showMessage(error.message);
