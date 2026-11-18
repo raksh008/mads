@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'branding.dart';
 import 'finance/finance_screens.dart';
+import 'network/doh_http_client.dart';
 import 'splash_screen.dart';
 
 // ==========================================
@@ -14,15 +15,20 @@ import 'splash_screen.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  const supabaseUrl = String.fromEnvironment(
+    'MADS_SUPABASE_URL',
+    defaultValue: 'https://ddslubflmmwxbqsyzign.supabase.co',
+  );
+
   await Supabase.initialize(
-    url: const String.fromEnvironment(
-      'MADS_SUPABASE_URL',
-      defaultValue: 'https://ddslubflmmwxbqsyzign.supabase.co',
-    ),
+    url: supabaseUrl,
     publishableKey: const String.fromEnvironment(
       'MADS_SUPABASE_PUBLISHABLE_KEY',
       defaultValue: 'sb_publishable_eHYVT4wNzAOy_DCv59RSqQ_EkTPArIL',
     ),
+    // Some networks return a wrong address for the Supabase host name. This
+    // client retries through encrypted DNS when the normal connection fails.
+    httpClient: DohFallbackClient(hosts: {Uri.parse(supabaseUrl).host}),
   );
 
   runApp(const MadsApp());
