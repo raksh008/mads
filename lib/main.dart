@@ -356,7 +356,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       if (!mounted) return;
 
       showMessage(
-        'Account created. If email confirmation is enabled, verify your email, then log in.',
+        'Account ready. You can log in now.',
       );
 
       // Keep the first route (the auth gate) under the login screen. Removing
